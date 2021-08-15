@@ -1,0 +1,61 @@
+说明：并不一定要设计成只为epoll的，而是做成一个通用的触发器，其他的要是支持异步通知的
+也能用这个reactor模式，这样的话就可以自定义通知事件了
+////////////////////////////////////////////////////////////////////////////////
+class Worker {
+public:
+	static void *handle(void *arg);
+	static void *exit(void *arg);
+private:
+}
+
+class ClientWorker : public Worker {
+public:
+	connect(server_ip, server_port);
+	
+	static void *handle(void *arg) {}
+	static void *exit(void *arg) {}
+private:
+}
+
+class ServerWorker {
+	create_server(server_ip, server_port)
+	
+	static void *handle(void *arg) {}
+	static void *exit(void *arg) {}
+}
+
+=============================================================================
+class SubReactor {
+public:
+	int add_client_handler(ClientWorker ..);
+	int remove_client_handler(ClientWorker ..);
+private:
+	void create_epoll();
+private:
+	ThreadPool pool;
+}
+==============================================================================
+class MainReactor {
+public:
+	MainReactor(SubReactor &sub_reactor): sub_reactor_(sub_reactor) {}
+
+	int add_acceptor_handler(ServerWorker ..) {
+		sub_reactor.add_client_handler(ServerWorker::ClientWorker ..);
+	}
+	int remove_acceptor_handler(ServerWoker ..) {}
+private:
+	void create_epoll();
+private:
+	SubReactor &sub_reactor_;
+}
+===============================================================================
+class Reactor {
+public:
+	void init();
+	void stop();
+	
+private:
+	MainReactor main_reactor_;
+	SubReactor sub_reactor_;
+	ThreadPool thread_pool_;
+}
