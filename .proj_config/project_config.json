@@ -1,0 +1,45 @@
+{
+	"AssociatedProject": [
+		"gtest"
+	],
+	"ChooseCompiler": [
+		{
+			"CompilerName": "g++",
+			"DebugOption": "-O0 -Wall -g -ggdb -std=c++11",
+			"ReleaseOption": "-O2 -Wall -std=c++11"
+		}
+	],"CompilationMethod": "debug",
+	"CompilationParameters": "-O0 -Wall -g -ggdb -std=c++11",
+	"CurrentCompiler": "g++",
+	"ExportFile": [
+		"gtest"
+	],
+	"GenerateFileType": "exe",
+	"HeaderFileDirectoryListing": [
+		
+	],
+	"LibraryDirectoryListing": {
+		"debug": [
+			
+		],
+		"release": [
+			
+		]
+	},
+	"LibraryListing": {
+		"debug": [
+			
+		],
+		"release": [
+			
+		]
+	},
+	"MainFileName": "",
+	"Name": "reactor",
+	"Path": "/home/ruanjian/workspace/project_v/reactor",
+	"ProgramRunArgs": "",
+	"SourceFileDirectoryListing": [
+		"src"
+	],
+	"UUID": "c1cc904f-bc70-4fd2-93a0-3cc4e34eb629"
+}
