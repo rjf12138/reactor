@@ -1,1 +1,2 @@
 epoll使用: 命令行： man epoll
+reactor: https://www.cnblogs.com/shujiying/p/12386505.html

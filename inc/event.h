@@ -1,7 +1,10 @@
 #ifndef __EVENT_BASE_H__
 #define __EVENT_BASE_H__
 
-#include "logger.h"
+#include "basic/logger.h"
+#include "data_structure/queue.h"
+#include "basic/byte_buffer.h"
+#include "system/system.h"
 
 namespace reactor {
 using namespace basic;
@@ -26,21 +29,25 @@ enum EventOperation {
     EventOperation_Del = 3  // 删除事件上的fd
 };
 
-typedef union event_handle {
-    int fd;
-} event_handle_t;
+typedef void (*handle_func_t)(int fd, void *arg);
+typedef struct EventHandle {
+    int fd;                 // fd 描述符
+    bool is_handling;       // 当前事件是不是已经有线程在处理了，防止两个线程处理同一个fd
+    uint32_t type;          // EventType 与的集合
+    EventOperation op;      // fd 上要进行的操作
 
-typedef union event_data {
-    void *ptr;
-    int fd;
-    uint32_t u32;
-    uint64_t u64;
-} event_data_t;
+    bool is_accept;         // 是不是acceptor的描述符
 
-typedef struct events {
-    event_data_t data;
-    uint32_t events;
-} events_t;
+    // accept 的处理函数
+    void *accept_arg;              // handle_func_t 参数
+    handle_func_t accept_func;     // 当事件触发时的处理函数
+
+    // 客户端连接时的处理函数
+    void *client_arg;
+    handle_func_t client_func;
+
+    ByteBuffer buffer;
+} EventHandle_t;
 
 class Event : public Logger{
 public:
@@ -48,8 +55,12 @@ public:
     virtual ~Event(void);
 
     virtual int event_init(int size = 5) = 0;
-    virtual int event_ctl(event_handle_t handle, EventOperation op, events &event) = 0;
-    virtual int event_wait(events_t *events, int max_size, int timeout) = 0;
+    virtual int event_ctl(EventHandle_t &handle) = 0;
+
+    EventMethod type(void) const {return type_;}
+
+private:
+    EventMethod type_;
 };
 
 class EventManager {
@@ -57,13 +68,17 @@ public:
     EventManager(EventMethod method);
     virtual ~EventManager(void);
 
-    int event_init(int size = 5);
-    int event_ctl(event_handle_t handle, EventOperation op, events &event);
-    int event_wait(events_t *events, int max_size, int timeout);
+    int init(void);
+    int ctl(EventHandle_t &handle);
 
 private:
-    EventMethod method_;
-    Event *event_;
+    std::map<uint64_t, Event*> events_map_;
+
+    util::ThreadPool thread_pool_;
+
+    util::Mutex mutex_;
+    ds::Queue<EventHandle_t*> recv_;
+    ds::Queue<EventHandle_t*> send_;
 };
 
 }

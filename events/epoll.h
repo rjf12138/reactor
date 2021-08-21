@@ -10,22 +10,33 @@
 namespace reactor {
 class Epoll : public Event {
 public:
-    Epoll(int events_size = 32);
+    // timeout: 毫秒， events_size: 最大返回触发的事件数
+    Epoll(util::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout = 3000, int events_size = 32);
     virtual ~Epoll(void);
 
     virtual int event_init(int size = 5) override;
-    virtual int event_ctl(event_handle_t fd, EventOperation op, events &event) override;
-    // max_size: 可以忽略，events的大小在开始的时候就设好了
-    virtual int event_wait(events_t *events, int max_size, int timeout) override;
+    virtual int event_ctl(EventHandle_t &handle) override;
+
+    // 事件处理函数和事件退出函数
+    static void* event_wait(void *arg);
+    static void* event_exit(void *arg);
 
 private:
     virtual struct epoll_event event_type_convt(uint32_t type);
 
 private:
-    int epfd_;
-    int events_size_;
+    bool exit_;         // 设置退出
+
+    int epfd_;          // epoll fd
+    int timeout_;       // epoll_wait 超时时间
+
+    int events_max_size_;   // 最大返回的触发事件
     struct epoll_event *events_;
 
+    util::Mutex *recv_queue_mtx_;
+    ds::Queue<EventHandle_t*> *recv_;
+    
+    std::map<int, EventHandle_t> events_map_; // 事件信息
 };
 
 

@@ -2,13 +2,18 @@
 
 namespace reactor {
 #ifdef __RJF_LINUX__
-Epoll::Epoll(int events_size = 32)
+Epoll::Epoll(util::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout, int events_size)
+:   exit_(false),
+    timeout_(timeout),
+    events_max_size_(events_size)
 {
-    events_size_ = 32;
+    recv_queue_mtx_ = mutex;
+    recv_ = recv;
+
     if (events_size > 0) {
-        events_size_ = events_size;
+        events_max_size_ = events_size;
     }
-    events_ = new epoll_event[events_size_];
+    events_ = new epoll_event[events_max_size_];
 }
 
 Epoll::~Epoll(void)
@@ -32,10 +37,10 @@ Epoll::event_init(int size = 5)
 }
 
 int 
-Epoll::event_ctl(event_handle_t handle, EventOperation op, events &event)
+Epoll::event_ctl(EventHandle_t &handle)
 {
     int epoll_op = 0;
-    switch (op)
+    switch (handle.op)
     {
     case EventOperation_Add: {
         epoll_op = EPOLL_CTL_ADD;
@@ -46,11 +51,13 @@ Epoll::event_ctl(event_handle_t handle, EventOperation op, events &event)
     case EventOperation_Del: {
         epoll_op = EPOLL_CTL_DEL;
     } break;
-    default:
-        break;
+    default:{
+        LOG_ERROR("epoll_ctl: Unknown EventOperate: %d", handle.op);
+        return -1;
+    }
     }
 
-    struct epoll_event events = this->event_type_convt(event.events);
+    struct epoll_event events = this->event_type_convt(handle.type);
     events.data.fd = handle.fd;
 
     int ret = epoll_ctl(epfd_, epoll_op, handle.fd, &events);
@@ -59,24 +66,60 @@ Epoll::event_ctl(event_handle_t handle, EventOperation op, events &event)
         return -1;
     }
 
+    if (handle.op == EventOperation_Del) {
+        auto del_iter = events_map_.find(handle.fd);
+        events_map_.erase(del_iter);
+    } else {
+        events_map_[handle.fd] = handle;
+    }
     return ret;
 }
 
-int 
-Epoll::event_wait(func, int timeout)
+void*
+Epoll::event_wait(void *arg)
 {
-    int ret = epoll_wait(epfd_, events_, events_size_, timeout);
-    if (ret == -1) {
-        LOG_ERROR("epoll_wait: %s", strerror(errno));
-        return -1;
+    if (arg == nullptr) {
+        LOG_GLOBAL_ERROR("arg is nullptr");
+        return nullptr;
     }
 
-    func(events) {
-        if ()
-        If()
+    Epoll *epoll_ptr = (Epoll*)arg;
+
+    while (epoll_ptr->exit_ == false) {
+        int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
+        if (ret == -1) {
+            LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
+            return nullptr;
+        } else if (ret == 0) {
+            continue;
+        }
+
+        epoll_ptr->recv_queue_mtx_->lock();
+        for (int i = 0; i < ret; ++i) {
+            auto find_iter = epoll_ptr->events_map_.find(epoll_ptr->events_[i].data.fd);
+            if (find_iter == epoll_ptr->events_map_.end()) {
+                continue;
+            }
+
+            epoll_ptr->recv_->push(&find_iter->second);
+        }
+        epoll_ptr->recv_queue_mtx_->unlock();
     }
 }
 
+void* 
+Epoll::event_exit(void *arg)
+{
+    if (arg == nullptr) {
+        LOG_GLOBAL_ERROR("arg is nullptr");
+        return nullptr;
+    }
+
+    Epoll *epoll_ptr = (Epoll*)arg;
+    epoll_ptr->exit_ = true;
+
+    return nullptr;
+}
 
 #define CONVERT_TYPE(src, dst, x, y) \
 {\
