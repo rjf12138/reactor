@@ -173,6 +173,16 @@ struct ThreadPoolConfig {
     ThreadPoolExitAction threadpool_exit_action; // 默认时强制关闭所有线程
 };
 
+struct ThreadPoolRunningInfo {
+    int running_threads_num;
+    int idle_threads_num;
+    int waiting_tasks;
+    int waiting_prio_tasks;
+    std::string curr_status;
+    std::string exit_action;
+    ThreadPoolConfig config;
+};
+
 class ThreadPool : public Thread {
     friend WorkThread;
 public:
@@ -192,8 +202,11 @@ public:
 
     // 设置最小的线程数量，当线程数量等于它时，线程即使超出它寿命依旧不杀死
     int set_threadpool_config(const ThreadPoolConfig &config);
+    ThreadPoolConfig get_threadpool_config(void) const {return thread_pool_config_;}
     // 打印线程池信息
     std::string info(void);
+    // 获取线程运行状态
+    ThreadPoolRunningInfo get_running_info(void);
     // 获取线程池状态
     ThreadState get_state(void) {return state_;}
 

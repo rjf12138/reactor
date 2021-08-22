@@ -29,7 +29,7 @@ enum EventOperation {
     EventOperation_Del = 3  // 删除事件上的fd
 };
 
-typedef void (*handle_func_t)(int fd, void *arg);
+typedef void* (*handle_func_t)(void *arg);
 typedef struct EventHandle {
     int fd;                 // fd 描述符
     bool is_handling;       // 当前事件是不是已经有线程在处理了，防止两个线程处理同一个fd
@@ -63,15 +63,34 @@ private:
     EventMethod type_;
 };
 
-class EventManager {
-public:
-    EventManager(EventMethod method);
-    virtual ~EventManager(void);
+/*
+ 线程分配： reactor 有两个线程，一个是事件等待线程，一个是结果发送线程
+ 剩下的是工作线程
+*/
 
-    int init(void);
-    int ctl(EventHandle_t &handle);
+typedef struct ReactorConfig {
+    int min_work_threads_num;
+    int max_work_threads_num;
+} ReactorConfig_t;
+
+class Reactor {
+public:
+    Reactor(void);
+    virtual ~Reactor(void);
+
+    int set_config(ReactorConfig_t config);
+
+    int event_init(void);
+    int event_ctl(EventHandle_t &handle);
 
 private:
+    static void* recv_buffer_func(void* arg);
+    static void* send_buffer_func(void* arg);
+
+private:
+    bool reactor_state_;
+
+    ReactorConfig_t config_;
     std::map<uint64_t, Event*> events_map_;
 
     util::ThreadPool thread_pool_;
@@ -79,6 +98,10 @@ private:
     util::Mutex mutex_;
     ds::Queue<EventHandle_t*> recv_;
     ds::Queue<EventHandle_t*> send_;
+
+    // 当事件已经有线程在处理，又有新的事件发生时
+    // 防止多个线程处理同一个事件，先暂存在这
+    std::map<int, EventHandle_t*> block_event_;
 };
 
 }

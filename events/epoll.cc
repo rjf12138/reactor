@@ -84,7 +84,6 @@ Epoll::event_wait(void *arg)
     }
 
     Epoll *epoll_ptr = (Epoll*)arg;
-
     while (epoll_ptr->exit_ == false) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
         if (ret == -1) {

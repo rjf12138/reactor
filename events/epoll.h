@@ -21,6 +21,8 @@ public:
     static void* event_wait(void *arg);
     static void* event_exit(void *arg);
 
+    static void* event_send(void *arg); // 发送返回的消息
+
 private:
     virtual struct epoll_event event_type_convt(uint32_t type);
 
