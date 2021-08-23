@@ -37,6 +37,7 @@ typedef struct EventHandle {
     
     uint32_t type;          // EventType 与的集合
     EventOperation op;      // fd 上要进行的操作
+    EventMethod method;     // 哪中类型的event, 目前只有epoll
 
     bool is_accept;         // 是不是acceptor的描述符
 
@@ -60,7 +61,7 @@ public:
     virtual int event_init(int size = 5) = 0;
     virtual int event_ctl(EventHandle_t &handle) = 0;
 
-    EventMethod type(void) const {return type_;}
+    EventMethod get_type(void) const {return type_;}
 
 private:
     EventMethod type_;
@@ -88,7 +89,7 @@ public:
 
 private:
     static void* recv_buffer_func(void* arg);
-    static void* send_buffer_func(void* arg);
+    static void* reactor_exit(void* arg);
 
 private:
     bool reactor_state_;

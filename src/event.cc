@@ -8,7 +8,12 @@ Reactor::Reactor(void)
     config_.max_work_threads_num = 18;// 2个reactor线程， 16个工作线程
     this->set_config(config_);
 }
-Reactor::~Reactor(void) {}
+Reactor::~Reactor(void) {
+    thread_pool_.stop_handler();
+    for (auto iter = events_map_.begin(); iter != events_map_.end(); ++iter) {
+        delete iter->second;
+    }
+}
 
 int 
 Reactor::set_config(ReactorConfig_t config)
@@ -27,12 +32,54 @@ int
 Reactor::event_init(void)
 {
     thread_pool_.init();
+
+    util::Task task;
+    task.work_func = Reactor::recv_buffer_func;
+    task.thread_arg = this;
+    task.exit_task = Reactor::reactor_exit;
+    task.exit_arg = this;
+    thread_pool_.add_task(task);
+    memset(&task, 0, sizeof(task));
+
+    // 创建epoll事件处理
+    Epoll *epoll_ptr = new Epoll(&mutex_, &recv_);
+    task.work_func = Epoll::event_wait;
+    task.thread_arg = epoll_ptr;
+    task.exit_task = Epoll::event_exit;
+    task.exit_arg = epoll_ptr;
+    thread_pool_.add_task(task);
+    events_map_[(uint64_t)epoll_ptr] = epoll_ptr;
 }
 
 int 
 Reactor::event_ctl(EventHandle_t &handle)
 {
+    if (handle.method == EventMethod_Epoll) {
+        for (auto iter = events_map_.begin(); iter != events_map_.end(); ++iter) {
+            if ((*iter->second).get_type() == EventMethod_Epoll) {
+                (*iter->second).event_ctl(handle);
+            }
+        }
+    } else {
+        return -1;
+    }
+    return 0;
+}
 
+void* 
+Reactor::reactor_exit(void* arg)
+{
+    if (arg == nullptr) {
+        LOG_GLOBAL_ERROR("arg is nullptr");
+        return nullptr;
+    }
+
+    EventHandle_t *handle_ptr = nullptr;
+    Reactor *reactor_ptr = (Reactor*)arg;
+
+    reactor_ptr->reactor_state_ = false;
+
+    return nullptr;
 }
 
 void* 
@@ -100,25 +147,6 @@ Reactor::recv_buffer_func(void* arg)
             }
             reactor_ptr->mutex_.unlock();
         }
-    }
-}
-
-void* 
-Reactor::send_buffer_func(void* arg)
-{
-    // 这个函数不需要，要发送消息时只要在 eventhandle_t 中添加一个标志位，设为true
-    // 在epoll 中send会在线程中循环检查，当发现有数据要发送时，读取bytebuffer的数据
-    if (arg == nullptr) {
-        LOG_GLOBAL_ERROR("arg is nullptr");
-        return nullptr;
-    }
-
-    EventHandle_t *handle_ptr = nullptr;
-    Reactor *reactor_ptr = (Reactor*)arg;
-    while (reactor_ptr->reactor_state_ == false) {
-        util::os_sleep(50); //每50ms处理一次任务
-
-
     }
 }
 
