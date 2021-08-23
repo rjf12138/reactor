@@ -39,6 +39,11 @@ Epoll::event_init(int size = 5)
 int 
 Epoll::event_ctl(EventHandle_t &handle)
 {
+    if (handle.tcp_conn.get_socket_state() == false) {
+        LOG_ERROR("get_socket_state: Error socket state: %d", handle.tcp_conn.get_socket());
+        return -1;
+    }
+
     int epoll_op = 0;
     switch (handle.op)
     {
@@ -58,19 +63,20 @@ Epoll::event_ctl(EventHandle_t &handle)
     }
 
     struct epoll_event events = this->event_type_convt(handle.type);
-    events.data.fd = handle.fd;
+    events.data.fd = handle.tcp_conn.get_socket();
 
-    int ret = epoll_ctl(epfd_, epoll_op, handle.fd, &events);
+    int ret = epoll_ctl(epfd_, epoll_op, handle.tcp_conn.get_socket(), &events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
     if (handle.op == EventOperation_Del) {
-        auto del_iter = events_map_.find(handle.fd);
+        auto del_iter = events_map_.find(handle.tcp_conn.get_socket());
         events_map_.erase(del_iter);
     } else {
-        events_map_[handle.fd] = handle;
+        events_map_[handle.tcp_conn.get_socket()] = handle;
+        events_map_[handle.tcp_conn.get_socket()].is_send_ready = false; // 当前缓存置为false， 不发送
     }
     return ret;
 }
@@ -101,9 +107,34 @@ Epoll::event_wait(void *arg)
             }
 
             epoll_ptr->recv_->push(&find_iter->second);
+            find_iter->second.is_send_ready = false; // 当前缓存置为false， 不发送
         }
         epoll_ptr->recv_queue_mtx_->unlock();
     }
+
+    return nullptr;
+}
+
+void* 
+Epoll::event_send(void *arg)
+{
+    if (arg == nullptr) {
+        LOG_GLOBAL_ERROR("arg is nullptr");
+        return nullptr;
+    }
+
+    Epoll *epoll_ptr = (Epoll*)arg;
+    while (epoll_ptr->exit_ == false) {
+        for (auto iter = epoll_ptr->events_map_.begin(); iter != epoll_ptr->events_map_.end(); ++iter) {
+            if (iter->second.is_send_ready == true) {
+                iter->second.tcp_conn.send(iter->second.buffer, iter->second.buffer.data_size(), 0);
+                iter->second.is_send_ready = false;
+            }
+        }
+        util::os_sleep(20);
+    }
+
+    return nullptr;
 }
 
 void* 

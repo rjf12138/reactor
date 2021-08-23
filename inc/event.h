@@ -31,8 +31,10 @@ enum EventOperation {
 
 typedef void* (*handle_func_t)(void *arg);
 typedef struct EventHandle {
-    int fd;                 // fd 描述符
+    util::SocketTCP tcp_conn;
+
     bool is_handling;       // 当前事件是不是已经有线程在处理了，防止两个线程处理同一个fd
+    
     uint32_t type;          // EventType 与的集合
     EventOperation op;      // fd 上要进行的操作
 
@@ -46,6 +48,7 @@ typedef struct EventHandle {
     void *client_arg;
     handle_func_t client_func;
 
+    bool is_send_ready;         // buffer 中的数据是不是要发送的
     ByteBuffer buffer;
 } EventHandle_t;
 

@@ -52,7 +52,7 @@ Reactor::recv_buffer_func(void* arg)
             auto iter = reactor_ptr->block_event_.begin();
             for (; iter != reactor_ptr->block_event_.end();) {
                 if (iter->second->is_handling == false) {
-                    auto find_iter = reactor_ptr->events_map_.find(iter->second->fd);
+                    auto find_iter = reactor_ptr->events_map_.find(iter->second->tcp_conn.get_socket());
                     if (find_iter != reactor_ptr->events_map_.end()) {
                         util::Task task; 
                         if (iter->second->is_accept == true && iter->second->accept_func != nullptr) {
@@ -75,13 +75,13 @@ Reactor::recv_buffer_func(void* arg)
         if (reactor_ptr->recv_.size() > 0) {
             reactor_ptr->mutex_.lock();
             reactor_ptr->recv_.pop(handle_ptr);
-            auto find_iter = reactor_ptr->block_event_.find(handle_ptr->fd);
+            auto find_iter = reactor_ptr->block_event_.find(handle_ptr->tcp_conn.get_socket());
             if (find_iter != reactor_ptr->block_event_.end()) { // 在block_event中有了，不在添加了
                 reactor_ptr->mutex_.unlock();
                 continue;
             } else {
                 if (handle_ptr->is_handling == true) { // 这个任务有线程在处理了，先放到block_event中等待处理
-                    reactor_ptr->block_event_[handle_ptr->fd] = handle_ptr;
+                    reactor_ptr->block_event_[handle_ptr->tcp_conn.get_socket()] = handle_ptr;
                     reactor_ptr->mutex_.unlock();
                     continue;
                 }
