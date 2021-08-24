@@ -127,7 +127,7 @@ Epoll::event_send(void *arg)
     while (epoll_ptr->exit_ == false) {
         for (auto iter = epoll_ptr->events_map_.begin(); iter != epoll_ptr->events_map_.end(); ++iter) {
             if (iter->second.is_send_ready == true) {
-                iter->second.tcp_conn.send(iter->second.buffer, iter->second.buffer.data_size(), 0);
+                iter->second.tcp_conn.send(iter->second.send_buffer, iter->second.send_buffer.data_size(), 0);
                 iter->second.is_send_ready = false;
             }
         }

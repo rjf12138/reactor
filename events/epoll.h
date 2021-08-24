@@ -2,7 +2,7 @@
 #define __EPOLL_H__
 
 #include "basic_head.h"
-#include "event.h"
+#include "reactor.h"
 
 #ifdef __RJF_LINUX__
 #include <sys/epoll.h>

@@ -1,13 +1,22 @@
 #include "epoll.h"
 
 namespace reactor {
-Reactor::Reactor(void)
-: reactor_state_(false)
+
+Reactor& 
+Reactor::get_instance(void)
 {
-    config_.min_work_threads_num = 6; // 2个reactor线程， 4个工作线程
-    config_.max_work_threads_num = 18;// 2个reactor线程， 16个工作线程
+    static Reactor instance;
+    return instance;
+}
+
+Reactor::Reactor(void)
+: reactor_stop_(true)
+{
+    config_.min_work_threads_num = 7; // 3个reactor线程， 4个工作线程
+    config_.max_work_threads_num = 19;// 3个reactor线程， 16个工作线程
     this->set_config(config_);
 }
+
 Reactor::~Reactor(void) {
     thread_pool_.stop_handler();
     for (auto iter = events_map_.begin(); iter != events_map_.end(); ++iter) {
@@ -31,6 +40,11 @@ Reactor::set_config(ReactorConfig_t config)
 int 
 Reactor::event_init(void)
 {
+    if (reactor_stop_ == false) {
+        LOG_WARN("Reactor is running");
+        return -1;
+    }
+    reactor_stop_ = false;
     thread_pool_.init();
 
     util::Task task;
@@ -49,6 +63,8 @@ Reactor::event_init(void)
     task.exit_arg = epoll_ptr;
     thread_pool_.add_task(task);
     events_map_[(uint64_t)epoll_ptr] = epoll_ptr;
+
+    return 0;
 }
 
 int 
@@ -77,7 +93,7 @@ Reactor::reactor_exit(void* arg)
     EventHandle_t *handle_ptr = nullptr;
     Reactor *reactor_ptr = (Reactor*)arg;
 
-    reactor_ptr->reactor_state_ = false;
+    reactor_ptr->reactor_stop_ = false;
 
     return nullptr;
 }
@@ -92,7 +108,7 @@ Reactor::recv_buffer_func(void* arg)
 
     EventHandle_t *handle_ptr = nullptr;
     Reactor *reactor_ptr = (Reactor*)arg;
-    while (reactor_ptr->reactor_state_ == false) {
+    while (reactor_ptr->reactor_stop_ == false) {
         util::os_sleep(50); //每50ms处理一次任务
 
         if (reactor_ptr->block_event_.size() > 0) {
