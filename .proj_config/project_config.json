@@ -3,7 +3,8 @@
 		"gtest",
 		"basic",
 		"data_structure",
-		"system"
+		"system",
+		"protocol"
 	],"ChooseCompiler": [
 		{
 			"CompilerName": "g++",

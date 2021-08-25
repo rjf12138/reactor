@@ -120,11 +120,11 @@ Reactor::recv_buffer_func(void* arg)
                         util::Task task; 
                         if (iter->second->is_accept == true && iter->second->accept_func != nullptr) {
                             task.work_func = iter->second->accept_func;
-                            task.thread_arg = iter->second->accept_arg;
+                            task.thread_arg = iter->second;//iter->second->accept_arg;
                             reactor_ptr->thread_pool_.add_task(task);
                         } else if (iter->second->client_func != nullptr) {
                             task.work_func = iter->second->client_func;
-                            task.thread_arg = iter->second->client_arg;
+                            task.thread_arg = iter->second;// iter->second->client_arg;
                             reactor_ptr->thread_pool_.add_task(task);
                         }
                     }
@@ -152,11 +152,11 @@ Reactor::recv_buffer_func(void* arg)
                 util::Task task; 
                 if (handle_ptr->is_accept == true && handle_ptr->accept_func != nullptr) {
                     task.work_func = handle_ptr->accept_func;
-                    task.thread_arg = handle_ptr->accept_arg;
+                    task.thread_arg = handle_ptr; // handle_ptr->accept_arg;
                     reactor_ptr->thread_pool_.add_task(task);
                 } else if (handle_ptr->client_func != nullptr) {
                     task.work_func = handle_ptr->client_func;
-                    task.thread_arg = handle_ptr->client_arg;
+                    task.thread_arg = handle_ptr; //handle_ptr->client_arg;
                     reactor_ptr->thread_pool_.add_task(task);
                 }
                 handle_ptr->is_handling = true; //这个任务正在处理了
