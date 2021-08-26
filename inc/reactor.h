@@ -31,7 +31,7 @@ enum EventOperation {
 
 typedef void* (*handle_func_t)(void *arg);
 typedef struct EventHandle {
-    util::SocketTCP tcp_conn;
+    util::SocketTCP *tcp_conn;
 
     bool is_handling;       // 当前事件是不是已经有线程在处理了，防止两个线程处理同一个fd
     
