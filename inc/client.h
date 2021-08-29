@@ -6,15 +6,16 @@
 
 namespace reactor {
 
-class Client {
+class Client : public Logger{
 public:
     Client(void);
     virtual ~Client(void);
 
-    // addr 格式：tcp: TCP://IP:Port/Ptl=[ws/http/raw], UDP: UDP://IP:Port/Ptl=[ws/http/raw], Proc: PROC://NAME:ID/Ptl=[ws/http/raw]
+    // TCP： websocket, HTTP, inproc
+    // 废弃addr 格式：tcp: TCP://IP:Port/Ptl=[ws/http/raw], UDP: UDP://IP:Port/Ptl=[ws/http/raw], Proc: PROC://NAME:ID/Ptl=[ws/http/raw]
     // TCP/UDP ===> EventMethod_Epoll
     // PROC=====>OTHER(目前不支持)
-    int connect(const std::string &addr, bool auto_reconnect = false);
+    int connect(const std::string &url, EventMethod method = EventMethod_Epoll, bool auto_reconnect = false);
     int disconnect(void);
 
     virtual int handle_msg(ByteBuffer &buffer, ByteBuffer &send_buf, bool &is_send);
