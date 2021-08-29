@@ -5,22 +5,18 @@
 #include "protocol/protocol.h"
 
 namespace reactor {
-// 格式例子: http://192.168.1.2:80/dir/index.html?uid=1
+// 格式例子: http://192.168.1.2:80/dir/index.html?uid=1&key=2
 class URLParser {
 public:
     URLParser(void);
-    URLParser(const std::string &url);
     ~URLParser(void);
 
     // 清除之前保存内容
     void clear(void);
-    // 解析是否成功
-    bool state(void) const {return state_;}
     // 解析url
-    int parser(const std::string &url);
+    ParserError parser(const std::string &url);
     
 public:
-    bool state_;
     ptl::ProtocolType type_;    // 协议类型
     std::string addr_;  // 服务器地址
     int port_;      // 服务器端口
