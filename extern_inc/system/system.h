@@ -5,6 +5,7 @@
 #include "basic/logger.h"
 #include "basic/byte_buffer.h"
 #include "data_structure/queue.h"
+#include "data_structure/heap.h"
 
 namespace util {
 
@@ -21,22 +22,56 @@ extern basic::msg_to_stream_callback g_msg_to_stream_fatal;
 extern void set_systemcall_message_output_callback(basic::InfoLevel level, basic::msg_to_stream_callback func);
 
 // 休眠时间,单位：毫秒 
-int os_sleep(int millisecond);
-// 时间转换：字符串时间格式： YY-MM-DD hh:mm:ss:ms
-std::string convert_to_string(uint64_t time);
-uint64_t convert_to_uint64(std::string time);
+// int os_sleep(int millisecond);
 
-uint64_t get_current_uint64_time(void);
-std::string get_current_string_time(void);
-
-std::string add_string_time(std::string time, uint32_t days = 0, uint32_t hours = 0, uint32_t mins = 0, uint32_t secs = 0);
-uint64_t add_uint64_time(uint64_t time, uint32_t days = 0, uint32_t hours = 0, uint32_t mins = 0, uint32_t secs = 0);
-
-std::string sub_string_time(std::string time, uint32_t days = 0, uint32_t hours = 0, uint32_t mins = 0, uint32_t secs = 0);
-uint64_t sub_uint64_time(uint64_t time, uint32_t days = 0, uint32_t hours = 0, uint32_t mins = 0, uint32_t secs = 0);
 /*
 * 所有的类成员函数成功了返回0， 失败返回非0值
 */
+//////////////////////////// 时间 //////////////////////////////////////////////////
+typedef uint64_t mtime_t; 
+typedef struct stime {
+    uint32_t days;
+    uint32_t hours;
+    uint32_t mins;
+    uint32_t secs;
+
+    stime(void)
+    :days(0),
+    hours(0),
+    mins(0),
+    secs(0) {}
+} stime_t;
+
+// 时间转换：默认格式： YY-MM-DD hh:mm:ss:ms
+#define DEFAULT_TIME_FMT "%Y-%m-%d %H:%M:%S"
+
+class Time : public Logger{
+public:
+    Time(void);
+    ~Time(void);
+
+    // 获取当前时间
+    mtime_t now(void);
+    // 格式化当前时间
+    std::string format(bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
+
+    // 当前时间加上一段时间
+    void add(const stime_t &t);
+    // 当前时间减去一段时间
+    void sub(const stime_t &t);
+
+public:
+    // 线程休眠时间
+    static int sleep(uint32_t mills);
+    // 字符串转成毫秒数
+    static mtime_t convert_to(const std::string &ti);
+    // 毫秒数转成字符串
+    static std::string convert_to(const mtime_t &ti, bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
+
+private:
+    mtime_t time_;
+};
+
 /////////////////////////////// 互斥量 /////////////////////////////////////////////
 class Mutex : public basic::Logger {
 public:
@@ -71,8 +106,6 @@ public:
     Thread(void);
     virtual ~Thread(void);
 
-    static void* create_func(void *arg);
-
     virtual int init(void);
     virtual int wait_thread(void);
 
@@ -83,6 +116,9 @@ public:
     virtual int stop_handler(void);
     // 设置开始标识，设置完后线程可以运行
     virtual int start_handler(void);
+
+private:
+    static void* create_func(void *arg);
 
 private:
 #ifdef __RJF_LINUX__
@@ -128,9 +164,6 @@ public:
     virtual int stop_handler(void);
     virtual int start_handler(void);
 
-    void thread_cond_wait(void);
-    void thread_cond_signal(void);
-
     // 暂停线程
     virtual int pause(void);
     // 继续执行线程
@@ -141,6 +174,9 @@ public:
     virtual int idle_timeout(void);
     virtual int reset_idle_life(void);
 
+private:
+    void thread_cond_wait(void);
+    void thread_cond_signal(void);
 private:
     time_t idle_life_; // 单位：秒
     time_t start_idle_life_;
@@ -356,7 +392,68 @@ private:
 
     struct sockaddr_in addr_;
 };
-///////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////// Timer //////////////////////////////////////////
+// 说明： 定时器最小能设置等待间隔时间是 5 ms
+enum TimerEventAttr {
+    TimerEventAttr_Exit, // 定时器到期后删除当前事件
+    TimerEventAttr_ReAdd, // 定时器到期后重新添加
+};
+
+typedef void* (*TimeEvent_callback_t)(void*);
+typedef struct TimerEvent {
+    int id; // 添加到定时器中时会返回一个ID
+    uint32_t expire_time; // 定时器触发的时间，不能小于当前时间
+    uint32_t wait_time; // 定时器等待的间隔时间。单位: ms, 必须大于 0
+    void* TimeEvent_arg; // 回调函数的参数
+    TimeEvent_callback_t TimeEvent_callback; // 定时器到期时的回调函数
+    TimerEventAttr attr;
+
+    bool operator>(const TimerEvent &rhs) {
+        return this->expire_time > rhs.expire_time;
+    }
+
+    bool operator<(const TimerEvent &rhs) {
+        return this->expire_time < rhs.expire_time;
+    }
+
+    bool operator==(const TimerEvent &rhs) {
+        return this->expire_time == rhs.expire_time;
+    }
+
+    TimerEvent(void)
+    :id(0),
+    expire_time(0),
+    wait_time(0),
+    attr(TimerEventAttr_Exit),
+    TimeEvent_arg(nullptr),
+    TimeEvent_callback(nullptr) {}
+
+    ~TimerEvent(void) {}
+} TimerEvent_t;
+
+class Timer : public Thread {
+public:
+    Timer(void);
+    ~Timer(void);
+
+    virtual int run_handler(void);
+    virtual int stop_handler(void);
+
+    // 添加定时器,错误返回-1， 成功返回一个定时器id
+    int add(TimerEvent_t &event);
+    // 根据定时器ID，取消定时器
+    int cancel(int id);
+    
+private:
+    bool exit_;
+    Time time_;
+    uint32_t loop_gap_;  // 单位： ms
+    uint32_t timer_id_;
+
+    Mutex mutex_;
+    ds::MinHeap<TimerEvent_t> timer_heap_;
+};
 
 }
 
