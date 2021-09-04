@@ -8,14 +8,13 @@ namespace reactor {
 
 class Client : public Logger{
 public:
-    Client(void);
+    Client(EventMethod method = EventMethod_Epoll);
     virtual ~Client(void);
 
-    // TCP： websocket, HTTP, inproc
-    // 废弃addr 格式：tcp: TCP://IP:Port/Ptl=[ws/http/raw], UDP: UDP://IP:Port/Ptl=[ws/http/raw], Proc: PROC://NAME:ID/Ptl=[ws/http/raw]
-    // TCP/UDP ===> EventMethod_Epoll
+    // TCP ===> EventMethod_Epoll
     // PROC=====>OTHER(目前不支持)
-    int connect(const std::string &url, EventMethod method = EventMethod_Epoll, bool auto_reconnect = false);
+    int connect(const std::string &url);
+    int reconnect(void);
     int disconnect(void);
 
     virtual int handle_msg(ByteBuffer &buffer, ByteBuffer &send_buf, bool &is_send);
@@ -26,13 +25,10 @@ private:
     static void* client_func(void* arg);// arg: EventHandle_t
 
 private:
-    bool auto_reconnect_;
-    bool is_connected_;
+    EventMethod method_;
 
-    int port;
-    std::string ip_;
-
-    ptl::ProtocolType type_;
+    util::SocketTCP socket_;
+    URLParser url_parser_;
 };
 
 }
