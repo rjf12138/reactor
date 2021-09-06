@@ -361,8 +361,8 @@ public:
     // cliaddr: 返回的客户端IP信息
     // addrlen: 设置cliaddr 结构的大小
     int accept(int &clisock, struct sockaddr *cliaddr = nullptr, socklen_t *addrlen = nullptr);
-    int recv(basic::ByteBuffer &buff, int buff_size, int flags);
-    int send(basic::ByteBuffer &buff, int buff_size, int flags);
+    int recv(basic::ByteBuffer &buff, int flags = 0);
+    int send(basic::ByteBuffer &buff, int flags = 0);
 
     // 配置socket
     // 设置成非阻塞

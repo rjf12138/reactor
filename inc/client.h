@@ -5,7 +5,7 @@
 #include "protocol/protocol.h"
 
 namespace reactor {
-
+// Client 不需要使用reactor,直接使用socket连接到服务器上就行了，只需维护这一条链接
 class Client : public Logger{
 public:
     Client(EventMethod method = EventMethod_Epoll);
@@ -17,11 +17,13 @@ public:
     int reconnect(void);
     int disconnect(void);
 
-    virtual int handle_msg(ByteBuffer &buffer, ByteBuffer &send_buf, bool &is_send);
-    virtual int handle_msg(ptl::HttpPtl &ptl, ByteBuffer &send_buf, bool &is_send);
-    virtual int handle_msg(ptl::WebsocketPtl &ptl, ByteBuffer &send_buf, bool &is_send);
+    virtual int handle_msg(ByteBuffer &buffer);
+    virtual int handle_msg(ptl::HttpPtl &ptl);
+    virtual int handle_msg(ptl::WebsocketPtl &ptl);
 
 private:
+    int connect_v();
+
     static void* client_func(void* arg);// arg: EventHandle_t
 
 private:
