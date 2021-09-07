@@ -24,9 +24,12 @@ Server::start(const std::string &ip, int port, ptl::ProtocolType type)
     EventHandle_t handle;
     handle.tcp_conn = &server_;
     handle.type = EventType_In | EventType_RDHup | EventType_Err;
-    handle.is_accept = true;
     handle.method = EventMethod_Epoll;
     handle.op = EventOperation_Add;
+
+    handle.is_accept = true;
+    handle.accept_func = Server::accept_func;
+    handle.accept_arg = 
 }
 
 int 
