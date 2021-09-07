@@ -78,7 +78,7 @@ typedef struct ReactorConfig {
     int max_work_threads_num;
 } ReactorConfig_t;
 
-class Reactor : public Logger{
+class Reactor : public Logger {
 public:
     virtual ~Reactor(void);
 

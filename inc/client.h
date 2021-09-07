@@ -23,12 +23,9 @@ public:
 
 private:
     int connect_v();
-
     static void* client_func(void* arg);// arg: EventHandle_t
 
 private:
-    EventMethod method_;
-
     util::SocketTCP socket_;
     URLParser url_parser_;
 };

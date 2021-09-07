@@ -4,7 +4,6 @@
 namespace reactor {
 
 Client::Client(EventMethod method)
-:method_(method)
 {
 
 }
@@ -17,17 +16,11 @@ Client::~Client(void)
 int
 Client::connect_v(void)
 {
-    if (method_ == EventMethod_Epoll) {
-        socket_.create_socket(url_parser_.addr_, url_parser_.port_);
-        if (socket_.get_socket_state() == false) {
-            return -1;
-        }
-        socket_.connect();
-        // socket_.setnonblocking();
-    } else {
-        LOG_WARN("Unknown method: %d", method_);
+    socket_.create_socket(url_parser_.addr_, url_parser_.port_);
+    if (socket_.get_socket_state() == false) {
         return -1;
     }
+    socket_.connect();
 
     return 0;
 }
