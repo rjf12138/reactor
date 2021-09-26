@@ -28,7 +28,7 @@ int
 Reactor::set_config(ReactorConfig_t config)
 {
     config_ = config;
-    util::ThreadPoolConfig thread_config = thread_pool_.get_threadpool_config();
+    os::ThreadPoolConfig thread_config = thread_pool_.get_threadpool_config();
     thread_config.min_thread_num = config_.min_work_threads_num;
     thread_config.max_thread_num = config_.max_work_threads_num;
     thread_config.max_waiting_task = 1000;
@@ -47,7 +47,7 @@ Reactor::event_init(void)
     reactor_stop_ = false;
     thread_pool_.init();
 
-    util::Task task;
+    os::Task task;
     task.work_func = Reactor::recv_buffer_func;
     task.thread_arg = this;
     task.exit_task = Reactor::reactor_exit;
@@ -55,8 +55,17 @@ Reactor::event_init(void)
     thread_pool_.add_task(task);
     memset(&task, 0, sizeof(task));
 
-    // 创建epoll事件处理
+    // epoll accept: 处理来自客户端的连接
     Epoll *epoll_ptr = new Epoll(&mutex_, &recv_);
+    task.work_func = Epoll::event_wait;
+    task.thread_arg = epoll_ptr;
+    task.exit_task = Epoll::event_exit;
+    task.exit_arg = epoll_ptr;
+    thread_pool_.add_task(task);
+    events_map_[(uint64_t)epoll_ptr] = epoll_ptr;
+
+    // epoll: 处理客户端发过来的数据
+    epoll_ptr = new Epoll(&mutex_, &recv_);
     task.work_func = Epoll::event_wait;
     task.thread_arg = epoll_ptr;
     task.exit_task = Epoll::event_exit;
@@ -109,15 +118,15 @@ Reactor::recv_buffer_func(void* arg)
     EventHandle_t *handle_ptr = nullptr;
     Reactor *reactor_ptr = (Reactor*)arg;
     while (reactor_ptr->reactor_stop_ == false) {
-        util::Time::sleep(10); //每10ms处理一次任务
+        os::Time::sleep(10); //每10ms处理一次任务
 
-        if (reactor_ptr->block_event_.size() > 0) {
-            auto iter = reactor_ptr->block_event_.begin();
-            for (; iter != reactor_ptr->block_event_.end();) {
+        if (reactor_ptr->event_buffer_.size() > 0) {
+            auto iter = reactor_ptr->event_buffer_.begin();
+            for (; iter != reactor_ptr->event_buffer_.end();) {
                 if (iter->second->is_handling == false) {
                     auto find_iter = reactor_ptr->events_map_.find(iter->second->tcp_conn->get_socket());
                     if (find_iter != reactor_ptr->events_map_.end()) {
-                        util::Task task; 
+                        os::Task task; 
                         if (iter->second->is_accept == true && iter->second->accept_func != nullptr) {
                             task.work_func = iter->second->accept_func;
                             task.thread_arg = iter->second;//iter->second->accept_arg;
@@ -128,7 +137,7 @@ Reactor::recv_buffer_func(void* arg)
                             reactor_ptr->thread_pool_.add_task(task);
                         }
                     }
-                    reactor_ptr->block_event_.erase(iter++);
+                    reactor_ptr->event_buffer_.erase(iter++);
                 } else {
                     ++iter;
                 }
@@ -138,18 +147,18 @@ Reactor::recv_buffer_func(void* arg)
         if (reactor_ptr->recv_.size() > 0) {
             reactor_ptr->mutex_.lock();
             reactor_ptr->recv_.pop(handle_ptr);
-            auto find_iter = reactor_ptr->block_event_.find(handle_ptr->tcp_conn->get_socket());
-            if (find_iter != reactor_ptr->block_event_.end()) { // 在block_event中有了，不在添加了
+            auto find_iter = reactor_ptr->event_buffer_.find(handle_ptr->tcp_conn->get_socket());
+            if (find_iter != reactor_ptr->event_buffer_.end()) { // 在block_event中有了，不在添加了
                 reactor_ptr->mutex_.unlock();
                 continue;
             } else {
                 if (handle_ptr->is_handling == true) { // 这个任务有线程在处理了，先放到block_event中等待处理
-                    reactor_ptr->block_event_[handle_ptr->tcp_conn->get_socket()] = handle_ptr;
+                    reactor_ptr->event_buffer_[handle_ptr->tcp_conn->get_socket()] = handle_ptr;
                     reactor_ptr->mutex_.unlock();
                     continue;
                 }
 
-                util::Task task; 
+                os::Task task; 
                 if (handle_ptr->is_accept == true && handle_ptr->accept_func != nullptr) {
                     task.work_func = handle_ptr->accept_func;
                     task.thread_arg = handle_ptr; // handle_ptr->accept_arg;

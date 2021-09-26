@@ -3,19 +3,23 @@
 
 #include "basic_head.h"
 #include "reactor.h"
+#include "util/util.h"
 
 #ifdef __RJF_LINUX__
 #include <sys/epoll.h>
 
 namespace reactor {
+
 class Epoll : public Event {
 public:
     // timeout: 毫秒， events_size: 最大返回触发的事件数
-    Epoll(util::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout = 3000, int events_size = 32);
+    Epoll(os::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout = 3000, int events_size = 32);
     virtual ~Epoll(void);
 
     virtual int event_init(int size = 5) override;
     virtual int event_ctl(EventHandle_t &handle) override;
+
+    virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
 
     // 事件处理函数和事件退出函数
     static void* event_wait(void *arg);
@@ -35,7 +39,7 @@ private:
     int events_max_size_;   // 最大返回的触发事件
     struct epoll_event *events_;
 
-    util::Mutex *recv_queue_mtx_;
+    os::Mutex *recv_queue_mtx_;
     ds::Queue<EventHandle_t*> *recv_;
     
     std::map<int, EventHandle_t> events_map_; // 事件信息

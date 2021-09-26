@@ -84,7 +84,7 @@ Client::client_func(void* arg)
         ptl::HttpPtl http_ptl;
         ptl::HttpParse_ErrorCode err;
         do {
-            err = http_ptl.parser(buffer);
+            err = http_ptl.parse(buffer);
             if (err == ptl::HttpParse_OK) {
                 client_ptr->handle_msg(http_ptl);
                 http_ptl.clear();

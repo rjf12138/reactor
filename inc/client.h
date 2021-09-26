@@ -26,7 +26,7 @@ private:
     static void* client_func(void* arg);// arg: EventHandle_t
 
 private:
-    util::SocketTCP socket_;
+    os::SocketTCP socket_;
     URLParser url_parser_;
 };
 

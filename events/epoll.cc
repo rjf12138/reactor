@@ -1,8 +1,9 @@
 #include "epoll.h"
 
 namespace reactor {
+
 #ifdef __RJF_LINUX__
-Epoll::Epoll(util::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout, int events_size)
+Epoll::Epoll(os::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout, int events_size)
 :   exit_(false),
     timeout_(timeout),
     events_max_size_(events_size)
@@ -22,6 +23,12 @@ Epoll::~Epoll(void)
         delete events_;
         events_ = nullptr;
     }
+}
+
+int 
+Epoll::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
+{
+    
 }
 
 int 
@@ -131,7 +138,7 @@ Epoll::event_send(void *arg)
                 iter->second.is_send_ready = false;
             }
         }
-        util::Time::sleep(20);
+        os::Time::sleep(20);
     }
 
     return nullptr;

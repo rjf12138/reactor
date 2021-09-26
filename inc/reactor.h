@@ -5,9 +5,23 @@
 #include "data_structure/queue.h"
 #include "basic/byte_buffer.h"
 #include "system/system.h"
+#include "util/util.h"
 
 namespace reactor {
 using namespace basic;
+/* 消息格式
+{
+    "msg_id": id[INT], //消息ID
+    "server_handler": id[INT], // 上层的服务类ID，用于调用数据处理函数
+    "recv_buffer": buffer[ByteBuffer*]，// 接收缓存
+    "send_buffer": buffer[ByteBuffer*]，// 发送缓存
+}
+*/
+enum EventMsgId {
+    EventMsgId_AddAcceptHandle = 100,           // 添加accept句柄，监听客户端的连接
+    EventMsgId_AddClientConnectHandle = 101,    // 添加客户端连接句柄，监听客户端发送的数据
+    EventMsgId_RecvClientDataEvent = 102,       // 客户端收到数据的事件
+};
 
 enum EventMethod {
     EventMethod_Unknown,
@@ -31,7 +45,7 @@ enum EventOperation {
 
 typedef void* (*handle_func_t)(void *arg);
 typedef struct EventHandle {
-    util::SocketTCP *tcp_conn;
+    os::SocketTCP *tcp_conn;
 
     bool is_handling;       // 当前事件是不是已经有线程在处理了，防止两个线程处理同一个fd
     
@@ -54,7 +68,7 @@ typedef struct EventHandle {
     ByteBuffer send_buffer;
 } EventHandle_t;
 
-class Event : public Logger{
+class Event : public Logger, public util::MsgObject {
 public:
     Event(void);
     virtual ~Event(void);
@@ -63,9 +77,11 @@ public:
     virtual int event_ctl(EventHandle_t &handle) = 0;
 
     EventMethod get_type(void) const {return type_;}
-
+    void set_main_handler(bool is_main) {is_main_handler_ = is_main;} 
+    
 private:
     EventMethod type_;
+    bool is_main_handler_; // reactor 中会有两个Event。一个是主的处理客户端连接，一个是辅的处理客户端数据
 };
 
 /*
@@ -78,7 +94,7 @@ typedef struct ReactorConfig {
     int max_work_threads_num;
 } ReactorConfig_t;
 
-class Reactor : public Logger {
+class Reactor : public Logger, public util::MsgObject {
 public:
     virtual ~Reactor(void);
 
@@ -102,15 +118,15 @@ private:
     ReactorConfig_t config_;
     std::map<uint64_t, Event*> events_map_;
 
-    util::ThreadPool thread_pool_;
+    os::ThreadPool thread_pool_;
 
-    util::Mutex mutex_;
+    os::Mutex mutex_;
     ds::Queue<EventHandle_t*> recv_;
     ds::Queue<EventHandle_t*> send_;
 
     // 当事件已经有线程在处理，又有新的事件发生时
     // 防止多个线程处理同一个事件，先暂存在这
-    std::map<int, EventHandle_t*> block_event_;
+    std::map<int, EventHandle_t*> event_buffer_;
 };
 
 }

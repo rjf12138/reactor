@@ -23,7 +23,7 @@ private:
 
 private:
     ptl::ProtocolType type_;
-    util::SocketTCP server_;
+    os::SocketTCP server_;
 };
 
 }

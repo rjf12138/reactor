@@ -4,7 +4,8 @@
 		"basic",
 		"data_structure",
 		"system",
-		"protocol"
+		"protocol",
+		"util"
 	],"ChooseCompiler": [
 		{
 			"CompilerName": "g++",
@@ -31,7 +32,7 @@
 	},
 	"LibraryListing": {
 		"debug": [
-			
+			"utild"
 		],
 		"release": [
 			

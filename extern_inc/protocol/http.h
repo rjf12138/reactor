@@ -22,7 +22,7 @@ public:
     HttpPtl(void);
     virtual ~HttpPtl(void);
 
-    HttpParse_ErrorCode parser(basic::ByteBuffer &data);
+    HttpParse_ErrorCode parse(basic::ByteBuffer &data);
     int generate(basic::ByteBuffer &data);
 
     int clear();
@@ -32,14 +32,16 @@ public:
     // 设置http回应头
     int set_response(int code, const std::string &phrase);
     // 设置回应消息短语
-    int set_phrase(std::string phrase);
+    int set_phrase(const std::string &phrase);
     // 设置报文主体内容
-    int set_content(basic::ByteBuffer &data);
+    int set_content(const basic::ByteBuffer &data);
     // 设置头选项
     int set_header_option(const std::string &key, const std::string &value);
 
     // 获取回应状态码
     int get_status_code(void);
+    // 获取请求URL
+    std::string get_url(void);
     // 获取http方法
     std::string get_method(void);
     // 获取消息短语
@@ -47,10 +49,10 @@ public:
     // 获取消息短语
     std::string get_header_option(const std::string &key);
     // 获取报文内容
-    ssize_t get_content(basic::ByteBuffer &data);
+    basic::ByteBuffer& get_content(void);
 
 private:
-    bool is_request;
+    bool is_request_;
     int code_;
     std::string url_;
     std::string method_;
