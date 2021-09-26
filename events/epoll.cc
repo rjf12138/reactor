@@ -3,18 +3,21 @@
 namespace reactor {
 
 #ifdef __RJF_LINUX__
-Epoll::Epoll(os::Mutex *mutex, ds::Queue<EventHandle_t*> *recv, int timeout, int events_size)
+Epoll::Epoll(bool main_handler, int timeout, int events_size)
 :   exit_(false),
+    main_handler_(main_handler),
     timeout_(timeout),
     events_max_size_(events_size)
 {
-    recv_queue_mtx_ = mutex;
-    recv_ = recv;
-
     if (events_size > 0) {
         events_max_size_ = events_size;
     }
     events_ = new epoll_event[events_max_size_];
+
+    epfd_ = epoll_create(5);
+    if (epfd_ == -1) {
+        LOG_ERROR("epoll_create: %s", strerror(errno));
+    }
 }
 
 Epoll::~Epoll(void)
@@ -28,31 +31,41 @@ Epoll::~Epoll(void)
 int 
 Epoll::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
 {
-    
-}
-
-int 
-Epoll::event_init(int size = 5)
-{
-    epfd_ = epoll_create(size);
-    if (epfd_ == -1) {
-        LOG_ERROR("epoll_create: %s", strerror(errno));
+    try {
+        basic::WeJson json(msg);
+        basic::JsonNumber jnum = json.get_object()[EVENT_MSG_NAME_MSGID];
+        switch (jnum.to_int())
+        {
+        case EventMsgId_AddAcceptHandle: 
+        {
+            basic::JsonNumber j_handle_ptr = json.get_object()[EVENT_MSG_NAME_EVENT_HANDLER_PTR];
+            EventHandle_t *handle_ptr = reinterpret_cast<EventHandle_t*>(j_handle_ptr.to_int());
+            this->event_ctl(handle_ptr);
+        } break;
+        case EventMsgId_AddClientConnectHandle: // 好像可以和上面的那个合并
+        {
+            basic::JsonNumber j_handle_ptr = json.get_object()[EVENT_MSG_NAME_EVENT_HANDLER_PTR];
+        } break;
+        default:
+            break;
+        }
+    } catch (std::exception &e) {
+        LOG_ERROR("%s", e.what());
         return -1;
     }
-
-    return epfd_;
+    return 0;
 }
 
 int 
-Epoll::event_ctl(EventHandle_t &handle)
+Epoll::event_ctl(EventHandle_t* handle_ptr)
 {
-    if (handle.tcp_conn->get_socket_state() == false) {
-        LOG_ERROR("get_socket_state: Error socket state: %d", handle.tcp_conn->get_socket());
+    if (handle_ptr->tcp_conn->get_socket_state() == false) {
+        LOG_ERROR("get_socket_state: Error socket state: %d", handle_ptr->tcp_conn->get_socket());
         return -1;
     }
 
     int epoll_op = 0;
-    switch (handle.op)
+    switch (handle_ptr->op)
     {
     case EventOperation_Add: {
         epoll_op = EPOLL_CTL_ADD;
@@ -64,26 +77,26 @@ Epoll::event_ctl(EventHandle_t &handle)
         epoll_op = EPOLL_CTL_DEL;
     } break;
     default:{
-        LOG_ERROR("epoll_ctl: Unknown EventOperate: %d", handle.op);
+        LOG_ERROR("epoll_ctl: Unknown EventOperate: %d", handle_ptr->op);
         return -1;
     }
     }
 
-    struct epoll_event events = this->event_type_convt(handle.type);
-    events.data.fd = handle.tcp_conn->get_socket();
+    struct epoll_event events = this->event_type_convt(handle_ptr->type);
+    events.data.fd = handle_ptr->tcp_conn->get_socket();
 
-    int ret = epoll_ctl(epfd_, epoll_op, handle.tcp_conn->get_socket(), &events);
+    int ret = epoll_ctl(epfd_, epoll_op, handle_ptr->tcp_conn->get_socket(), &events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
-    if (handle.op == EventOperation_Del) {
-        auto del_iter = events_map_.find(handle.tcp_conn->get_socket());
+    if (handle_ptr->op == EventOperation_Del) {
+        auto del_iter = events_map_.find(handle_ptr->tcp_conn->get_socket());
         events_map_.erase(del_iter);
-    } else if (handle.op == EventOperation_Add) {
-        events_map_[handle.tcp_conn->get_socket()] = handle;
-        events_map_[handle.tcp_conn->get_socket()].is_send_ready = false; // 当前缓存置为false， 不发送
+    } else if (handle_ptr->op == EventOperation_Add) {
+        events_map_[handle_ptr->tcp_conn->get_socket()] = handle_ptr;
+        events_map_[handle_ptr->tcp_conn->get_socket()]->is_send_ready = false; // 当前缓存置为false， 不发送
     }
     return ret;
 }

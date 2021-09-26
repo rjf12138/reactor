@@ -51,7 +51,8 @@ public:
     virtual std::string to_string(void) override;
 
     double to_double(void) const  {return value_;}
-    int to_int(void) const {return static_cast<int>(value_);}
+    uint64_t to_uint(void) const {return static_cast<uint64_t>(value_);}
+    int64_t to_int(void) const {return static_cast<int64_t>(value_);}
 
     bool operator==(const JsonNumber& rhs) const;
     bool operator!=(const JsonNumber& rhs) const;

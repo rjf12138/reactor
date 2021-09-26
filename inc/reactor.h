@@ -12,11 +12,20 @@ using namespace basic;
 /* 消息格式
 {
     "msg_id": id[INT], //消息ID
+    "socket": socket[INT], //socket描述符
     "server_handler": id[INT], // 上层的服务类ID，用于调用数据处理函数
     "recv_buffer": buffer[ByteBuffer*]，// 接收缓存
     "send_buffer": buffer[ByteBuffer*]，// 发送缓存
+    "event_handler_ptr": ptr[EventHandle_t*] 句柄指针
 }
 */
+#define EVENT_MSG_NAME_MSGID                "msg_id"
+#define EVENT_MSG_NAME_SOCKET               "socket"
+#define EVENT_MSG_NAME_SERVER_HANDLE        "server_handler"
+#define EVENT_MSG_NAME_RECV_BUFFER          "recv_buffer"
+#define EVENT_MSG_NAME_SEND_BUFFER          "send_buffer"
+#define EVENT_MSG_NAME_EVENT_HANDLER_PTR    "event_handler_ptr"
+
 enum EventMsgId {
     EventMsgId_AddAcceptHandle = 100,           // 添加accept句柄，监听客户端的连接
     EventMsgId_AddClientConnectHandle = 101,    // 添加客户端连接句柄，监听客户端发送的数据
@@ -74,7 +83,7 @@ public:
     virtual ~Event(void);
 
     virtual int event_init(int size = 5) = 0;
-    virtual int event_ctl(EventHandle_t &handle) = 0;
+    virtual int event_ctl(EventHandle_t *handle) = 0;
 
     EventMethod get_type(void) const {return type_;}
     void set_main_handler(bool is_main) {is_main_handler_ = is_main;} 
