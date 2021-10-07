@@ -27,9 +27,8 @@ using namespace basic;
 #define EVENT_MSG_NAME_EVENT_HANDLER_PTR    "event_handler_ptr"
 
 enum EventMsgId {
-    EventMsgId_AddAcceptHandle = 100,           // 添加accept句柄，监听客户端的连接
-    EventMsgId_AddClientConnectHandle = 101,    // 添加客户端连接句柄，监听客户端发送的数据
-    EventMsgId_RecvClientDataEvent = 102,       // 客户端收到数据的事件
+    EventMsgId_AddHandle = 100,           // 添加accept句柄，监听客户端的连接
+    EventMsgId_RecvClientDataEvent = 101,       // 客户端收到数据的事件
 };
 
 enum EventMethod {
@@ -99,8 +98,7 @@ private:
 */
 
 typedef struct ReactorConfig {
-    int min_work_threads_num;
-    int max_work_threads_num;
+    uint32_t recv_queue_size; // 消息接收队列数量（每个线程处理一个消息队列）
 } ReactorConfig_t;
 
 class Reactor : public Logger, public util::MsgObject {

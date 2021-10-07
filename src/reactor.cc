@@ -82,7 +82,7 @@ Reactor::event_ctl(EventHandle_t &handle)
     if (handle.method == EventMethod_Epoll) {
         for (auto iter = events_map_.begin(); iter != events_map_.end(); ++iter) {
             if ((*iter->second).get_type() == EventMethod_Epoll) {
-                (*iter->second).event_ctl(handle);
+                (*iter->second).event_ctl(&handle);
             }
         }
     } else {

@@ -5,7 +5,7 @@ namespace reactor {
 #ifdef __RJF_LINUX__
 Epoll::Epoll(bool main_handler, int timeout, int events_size)
 :   exit_(false),
-    main_handler_(main_handler),
+    is_main_handler_(main_handler),
     timeout_(timeout),
     events_max_size_(events_size)
 {
@@ -36,15 +36,11 @@ Epoll::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
         basic::JsonNumber jnum = json.get_object()[EVENT_MSG_NAME_MSGID];
         switch (jnum.to_int())
         {
-        case EventMsgId_AddAcceptHandle: 
+        case EventMsgId_AddHandle: 
         {
             basic::JsonNumber j_handle_ptr = json.get_object()[EVENT_MSG_NAME_EVENT_HANDLER_PTR];
             EventHandle_t *handle_ptr = reinterpret_cast<EventHandle_t*>(j_handle_ptr.to_int());
             this->event_ctl(handle_ptr);
-        } break;
-        case EventMsgId_AddClientConnectHandle: // 好像可以和上面的那个合并
-        {
-            basic::JsonNumber j_handle_ptr = json.get_object()[EVENT_MSG_NAME_EVENT_HANDLER_PTR];
         } break;
         default:
             break;
@@ -119,8 +115,17 @@ Epoll::event_wait(void *arg)
             continue;
         }
 
-        epoll_ptr->recv_queue_mtx_->lock();
         for (int i = 0; i < ret; ++i) {
+            if (epoll_ptr->is_main_handler_ == true) {
+                basic::WeJson json;
+                json.create_object();
+                json.get_object().add(EVENT_MSG_NAME_MSGID, EventMsgId_AddHandle);
+                json.get_object().add(EVENT_MSG_NAME_SOCKET, epoll_ptr->events_[i].data.fd);
+
+            }
+        }
+        epoll_ptr->recv_queue_mtx_->lock();
+        
             auto find_iter = epoll_ptr->events_map_.find(epoll_ptr->events_[i].data.fd);
             if (find_iter == epoll_ptr->events_map_.end()) {
                 continue;
