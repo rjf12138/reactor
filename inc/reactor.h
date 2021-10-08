@@ -51,21 +51,31 @@ enum EventOperation {
     EventOperation_Del = 3  // 删除事件上的fd
 };
 
+enum EventHandleState {  // 事件当前状态
+    EventHandleState_Idle,      // 未触发任何事件
+    EventHandleState_Ready,     // 事件已经触发但是还未处理
+    EventHandleState_Handling,  // 正在处理就绪事件
+};
 typedef void* (*handle_func_t)(void *arg);
 typedef struct EventHandle {
-    os::SocketTCP *tcp_conn;
+    os::SocketTCP *acceptor;    // 监听套接字连接
 
-    bool is_handling;       // 当前事件是不是已经有线程在处理了，防止两个线程处理同一个fd
+    os::Mutex client_conn_mutex;
+    ds::Queue<os::SocketTCP*> client_conn; // 客户端连接
+
+    EventHandleState state;     // 事件当前状态
     
-    uint32_t type;          // EventType 与的集合
-    EventOperation op;      // fd 上要进行的操作
-    EventMethod method;     // 哪中类型的event, 目前只有epoll
+    os::Mutex event_mutex;
+    ds::Queue<uint32_t> events; // 事件集合
 
-    bool is_accept;         // 是不是acceptor的描述符
+    EventOperation op;          // fd 上要进行的操作
+    EventMethod method;         // 哪中类型的event, 目前只有epoll
+
+    bool is_accept;             // 是不是acceptor的描述符
 
     // accept 的处理函数
-    void *accept_arg;              // handle_func_t 参数
-    handle_func_t accept_func;     // 当事件触发时的处理函数
+    void *accept_arg;           // handle_func_t 参数
+    handle_func_t accept_func;  // 当事件触发时的处理函数
 
     // 客户端连接时的处理函数
     void *client_arg;
@@ -98,7 +108,8 @@ private:
 */
 
 typedef struct ReactorConfig {
-    uint32_t recv_queue_size; // 消息接收队列数量（每个线程处理一个消息队列）
+    uint32_t min_thread_num; // 最小线程数
+    uint32_t max_thread_num; // 最大线程数
 } ReactorConfig_t;
 
 class Reactor : public Logger, public util::MsgObject {
