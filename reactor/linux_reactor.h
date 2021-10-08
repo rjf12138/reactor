@@ -35,10 +35,12 @@ public:
     SubReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~SubReactor(void);
 
-    // 添加/修改/删除客户端
-    int client_ctl(EventHandle_t *handle_ptr);
+    // 注册服务
+    int server_register(EventHandle_t *handle_ptr);
     // 添加新的客户端连接
     int add_client_conn(os::SocketTCP *client_ptr);
+    // 移除客户端连接
+    int remove_client_conn();
 
     // 事件处理函数
     static void* event_wait(void *arg);
