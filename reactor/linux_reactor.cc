@@ -126,6 +126,50 @@ SubReactor::server_register(EventHandle_t *handle_ptr)
         LOG_ERROR("get_socket_state: Error acceptor socket state: %d", handle_ptr->acceptor->get_socket());
         return -1;
     }
+
+    servers_[handle_ptr->acceptor->get_socket()] = handle_ptr;
+    return 0;
+}
+
+int 
+SubReactor::add_client_conn(int listen_fd, os::SocketTCP *client_ptr)
+{
+    if (client_ptr == nullptr) {
+        LOG_ERROR("client_ptr is nullptr");
+        return -1;
+    }
+
+    auto find_iter = servers_.find(listen_fd);
+    if (find_iter == servers_.end()) {
+        LOG_ERROR("Can't find listen fd: %d", listen_fd);
+        return -1;
+    }
+
+    if (client_ptr->get_socket_state() == false) {
+        LOG_ERROR("get_socket_state: Error client socket state: %d", client_ptr->get_socket());
+        return -1;
+    }
+
+    EventHandle_t *handle_ptr = find_iter->second;
+    if (handle_ptr->acceptor->get_socket_state() == false) {
+        LOG_ERROR("get_socket_state: Error acceptor socket state: %d", handle_ptr->acceptor->get_socket());
+        return -1;
+    }
+
+    handle_ptr->client_conn_mutex.lock();
+    handle_ptr->client_conn.push(client_ptr);
+    handle_ptr->client_conn_mutex.unlock();
+
+    struct epoll_event ep_events = std_to_epoll_events(handle_ptr->events);
+    ep_events.data.fd = client_ptr->get_socket();
+
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, client_ptr->get_socket(), &ep_events);
+    if (ret == -1) {
+        LOG_ERROR("epoll_ctl: %s", strerror(errno));
+        return -1;
+    }
+
+    return 0;
 }
 
 int 
@@ -379,7 +423,7 @@ MainReactor::event_wait(void *arg)
             if (find_iter->second->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0) {
                 os::SocketTCP *client_ptr = new os::SocketTCP();
                 client_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
-                epoll_ptr->sub_reactor_.add_client_conn(client_ptr);
+                epoll_ptr->sub_reactor_.add_client_conn(find_iter->second->acceptor->get_socket(), client_ptr);
             }
         }
     }

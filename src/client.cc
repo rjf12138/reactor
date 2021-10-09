@@ -89,6 +89,7 @@ Client::client_func(void* arg)
                 client_ptr->handle_msg(http_ptl);
                 http_ptl.clear();
             } else if (err != ptl::HttpParse_ContentNotEnough) {
+                //TODO： 协议解析错误时，断开连接
                 buffer.clear();
             }
         } while (err == ptl::HttpParse_OK);
@@ -101,6 +102,7 @@ Client::client_func(void* arg)
                 client_ptr->handle_msg(ws_ptl);
                 ws_ptl.clear();
             } else if (err != ptl::WebsocketParse_PacketNotEnough) {
+                //TODO： 协议解析错误时，断开连接
                 buffer.clear();
             }
         } while (err == ptl::WebsocketParse_OK);

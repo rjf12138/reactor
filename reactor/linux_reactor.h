@@ -38,7 +38,7 @@ public:
     // 注册服务
     int server_register(EventHandle_t *handle_ptr);
     // 添加新的客户端连接
-    int add_client_conn(os::SocketTCP *client_ptr);
+    int add_client_conn(int listen_fd, os::SocketTCP *client_ptr);
     // 移除客户端连接
     int remove_client_conn();
 
@@ -57,7 +57,7 @@ private:
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
 
-    std::map<int, EventHandle_t*> client_;
+    std::map<int, EventHandle_t*> servers_;
 };
 
 /////////////////////////// 处理客户端的连接 ///////////////////////////////////////////

@@ -64,18 +64,11 @@ typedef struct EventHandle {
     ds::Queue<os::SocketTCP*> client_conn; // 客户端连接
 
     EventHandleState state;     // 事件当前状态
-    
-    os::Mutex event_mutex;
-    ds::Queue<uint32_t> events; // 事件集合
+
+    uint32_t events;            // 事件集合
 
     EventOperation op;          // fd 上要进行的操作
     EventMethod method;         // 哪中类型的event, 目前只有epoll
-
-    bool is_accept;             // 是不是acceptor的描述符
-
-    // accept 的处理函数
-    void *accept_arg;           // handle_func_t 参数
-    handle_func_t accept_func;  // 当事件触发时的处理函数
 
     // 客户端连接时的处理函数
     void *client_arg;
