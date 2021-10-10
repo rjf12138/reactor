@@ -40,7 +40,7 @@ public:
     // 添加新的客户端连接
     int add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr);
     // 移除客户端连接
-    int remove_client_conn(client_id_t id);
+    int remove_client_conn(server_id_t sid, client_id_t cid);
 
     // 事件处理函数
     static void* event_wait(void *arg);
@@ -50,6 +50,9 @@ public:
     static void* event_send(void *arg); 
 
 private:
+    inline EventHandle_t* get_event_handle(int client_sock);
+
+private:
     bool exit_;
     int epfd_;
 
@@ -57,7 +60,8 @@ private:
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
 
-    std::map<int, EventHandle_t*> servers_;
+    std::map<int, server_id_t> client_conn_to_;
+    std::map<server_id_t, EventHandle_t*> servers_;
 };
 
 /////////////////////////// 处理客户端的连接 ///////////////////////////////////////////
@@ -66,8 +70,10 @@ public:
     MainReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~MainReactor(void);
 
-    // 添加/修改/删除客户端连接
-    int server_ctl(EventHandle_t *handle_ptr);
+    // 添加服务端监听连接
+    int add_server_accept(EventHandle_t *handle_ptr);
+    // 删除服务端监听连接
+    int remove_server_accept(server_id_t sid);
 
     // 事件处理函数
     static void* event_wait(void *arg);
@@ -85,7 +91,9 @@ private:
     struct epoll_event *events_;
 
     SubReactor sub_reactor_;
-    std::map<int, EventHandle_t*> acceptor_;
+
+    os::Mutex server_ctl_mutex_;
+    std::map<server_id_t, EventHandle_t*> acceptor_;
 };
 
 

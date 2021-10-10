@@ -114,6 +114,22 @@ SubReactor::~SubReactor(void)
     }
 }
 
+EventHandle_t*
+SubReactor::get_event_handle(int client_sock)
+{
+    auto server_iter = client_conn_to_.find(client_sock);
+    if (server_iter == client_conn_to_.end()) {
+        return nullptr;
+    }
+
+    auto handle_iter = servers_.find(server_iter->second);
+    if (handle_iter == servers_.end()) {
+        return nullptr;
+    }
+
+    return handle_iter->second;
+}
+
 int 
 SubReactor::server_register(EventHandle_t *handle_ptr)
 {
@@ -156,6 +172,7 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
         return -1;
     }
 
+    // 添加客户端连接监听
     struct epoll_event ep_events = std_to_epoll_events(handle_ptr->events);
     ep_events.data.fd = client_conn_ptr->client_ptr->get_socket();
 
@@ -167,79 +184,46 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
 
     handle_ptr->client_conn_mutex.lock();
     handle_ptr->client_conn[client_conn_ptr->client_id] = client_conn_ptr;
+    client_conn_to_[client_conn_ptr->client_ptr->get_socket()] = handle_ptr->server_id;
     handle_ptr->client_conn_mutex.unlock();
 
     return 0;
 }
 
 int 
-SubReactor::remove_client_conn(client_id_t id)
+SubReactor::remove_client_conn(server_id_t sid, client_id_t cid)
 {
-
-}
-
-int 
-SubReactor::client_ctl(EventHandle_t *handle_ptr)
-{
-    if (handle_ptr == nullptr) {
-        LOG_ERROR("handle_ptr is nullptr");
+    auto find_iter = servers_.find(sid);
+    if (find_iter == servers_.end()) {
+        LOG_ERROR("Can't find server id: 0x%x", sid);
         return -1;
     }
 
-    if (handle_ptr->tcp_conn->get_socket_state() == false) {
-        LOG_ERROR("get_socket_state: Error socket state: %d", handle_ptr->tcp_conn->get_socket());
-        return -1;
+    EventHandle_t *handle_ptr = find_iter->second;
+    auto client_iter = handle_ptr->client_conn.find(cid);
+    if (client_iter == handle_ptr->client_conn.end()) {
+        return 0;
     }
 
-    int epoll_op = 0;
-    switch (handle_ptr->op)
-    {
-        case EventOperation_Add: {
-            epoll_op = EPOLL_CTL_ADD;
-        } break;
-        case EventOperation_Mod: {
-            epoll_op = EPOLL_CTL_MOD;
-        } break;
-        case EventOperation_Del: {
-            epoll_op = EPOLL_CTL_DEL;
-        } break;
-        default:{
-            LOG_ERROR("epoll_ctl: Unknown EventOperate: %d", handle_ptr->op);
-            return -1;
-        }
-    }
-
-    uint32_t events = 0;
-    if (handle_ptr->events.pop(events) <= 0) {
-        return -1;
-    }
-    struct epoll_event ep_events = std_to_epoll_events(events);
-    ep_events.data.fd = handle_ptr->tcp_conn->get_socket();
-
-    int ret = epoll_ctl(epfd_, epoll_op, handle_ptr->tcp_conn->get_socket(), &ep_events);
+    // 移除客户端连接监听
+    struct epoll_event ep_events = std_to_epoll_events(handle_ptr->events);
+    ep_events.data.fd = client_iter->second->client_ptr->get_socket();
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_DEL, client_iter->second->client_ptr->get_socket(), &ep_events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
-    int fd = handle_ptr->tcp_conn->get_socket();
-    if (handle_ptr->op == EventOperation_Del) {
-        auto del_iter = client_.find(fd);
-        if (del_iter != client_.end()) {
-            LOG_INFO("Close client socket: %d", fd);
-            client_.erase(del_iter);
-            del_iter->second->tcp_conn->close();
-        }
-    } else if (handle_ptr->op == EventOperation_Add) {
-        if (client_.find(fd) != client_.end()) {
-            LOG_INFO("Client socket[%d] already exists", fd);
-            return -1;
-        }
-        client_[fd] = handle_ptr;
-        client_[fd]->is_send_ready = false; // 当前缓存置为false， 不发送
-    }
+    ClientConn_t *del_conn_ptr = client_iter->second;
+    auto client_conn_to_iter = client_conn_to_.find(client_iter->second->client_ptr->get_socket());
+    handle_ptr->client_conn_mutex.lock();
+    client_conn_to_.erase(client_conn_to_iter);
+    handle_ptr->client_conn.erase(client_iter);
+    handle_ptr->client_conn_mutex.unlock();
 
-    return ret;
+    delete del_conn_ptr; // 销毁ClientConn_t时会自动关闭连接
+    
+    return 0;
 }
 
 void* 
@@ -261,24 +245,22 @@ SubReactor::event_wait(void *arg)
         }
 
         for (int i = 0; i < ret; ++i) {
-            auto find_iter = epoll_ptr->client_.find(epoll_ptr->events_[i].data.fd);
-            if (find_iter == epoll_ptr->client_.end()) {
+            EventHandle_t *handle_ptr = epoll_ptr->get_event_handle(epoll_ptr->events_[i].data.fd);
+            if (handle_ptr == nullptr) {
+                LOG_GLOBAL_WARN("Cant find EventHandle of socket[%d]", epoll_ptr->events_[i].data.fd);
                 continue;
             }
 
-            find_iter->second->event_mutex.lock();
-            find_iter->second->events.push(epoll_events_to_std(epoll_ptr->events_[i].events));
-            find_iter->second->event_mutex.unlock();
+            handle_ptr->ready_sock_mutex.lock();
+            handle_ptr->ready_sock.push(epoll_ptr->events_[i].data.fd);
+            handle_ptr->ready_sock_mutex.unlock();
 
-            if (find_iter->second->state == EventHandleState_Idle) {
-                find_iter->second->is_send_ready = false; // 当前缓存置为false， 不发送消息
-                find_iter->second->state = EventHandleState_Ready;
+            if (handle_ptr->state == EventHandleState_Idle) {
+                handle_ptr->state = EventHandleState_Ready;
 
                 os::Task task;
-                task.work_func = find_iter->second->client_func;
-                task.thread_arg = find_iter->second->client_arg;
-                task.exit_task = nullptr;
-                task.exit_arg = nullptr;
+                task.work_func = handle_ptr->client_func;
+                task.thread_arg = handle_ptr->client_arg;
 
                 MsgHandleCenter::instance()->add_task(task);
             }
@@ -336,7 +318,7 @@ MainReactor::~MainReactor(void)
 }
 
 int 
-MainReactor::client_ctl(EventHandle_t *handle_ptr)
+MainReactor::add_server_accept(EventHandle_t *handle_ptr)
 {
     if (handle_ptr == nullptr) {
         LOG_ERROR("handle_ptr is nullptr");
@@ -348,55 +330,47 @@ MainReactor::client_ctl(EventHandle_t *handle_ptr)
         return -1;
     }
 
-    int epoll_op = 0;
-    switch (handle_ptr->op)
-    {
-        case EventOperation_Add: {
-            epoll_op = EPOLL_CTL_ADD;
-        } break;
-        case EventOperation_Mod: {
-            epoll_op = EPOLL_CTL_MOD;
-        } break;
-        case EventOperation_Del: {
-            epoll_op = EPOLL_CTL_DEL;
-        } break;
-        default:{
-            LOG_ERROR("epoll_ctl: Unknown EventOperate: %d", handle_ptr->op);
-            return -1;
-        }
-    }
-
-    uint32_t events = 0;
-    if (handle_ptr->events.pop(events) <= 0) {
-        return -1;
-    }
-    struct epoll_event ep_events = std_to_epoll_events(events);
+    struct epoll_event ep_events;
+    ep_events.events = EPOLLIN;
     ep_events.data.fd = handle_ptr->acceptor->get_socket();
-
-    int ret = epoll_ctl(epfd_, epoll_op, handle_ptr->acceptor->get_socket(), &ep_events);
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, handle_ptr->acceptor->get_socket(), &ep_events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
-    int fd = handle_ptr->acceptor->get_socket();
-    if (handle_ptr->op == EventOperation_Del) {
-        auto del_iter = acceptor_.find(fd);
-        if (del_iter != acceptor_.end()) {   // TODO: 关闭服务器前关闭所有客户端连接
-            LOG_INFO("Close client socket: %d", fd);
-            acceptor_.erase(del_iter);
-            del_iter->second->acceptor->close();
-        }
-    } else if (handle_ptr->op == EventOperation_Add) {
-        if (acceptor_.find(fd) != acceptor_.end()) {
-            LOG_INFO("Client socket[%d] already exists", fd);
-            return -1;
-        }
-        acceptor_[fd] = handle_ptr;
-        acceptor_[fd]->is_send_ready = false; // 当前缓存置为false， 不发送
+    server_ctl_mutex_.lock();
+    acceptor_[handle_ptr->server_id] = handle_ptr;
+    sub_reactor_.server_register(handle_ptr);
+    server_ctl_mutex_.unlock();
+
+    return 0;
+}
+
+int 
+MainReactor::remove_server_accept(server_id_t sid)
+{
+    auto accept_iter = acceptor_.find(sid);
+    if (accept_iter == acceptor_.end()) {
+        LOG_WARN("Can't find server id[%ld]", sid);
+        return -1;
     }
 
-    return ret;
+    // 关闭服务端端口监听
+    // 1. 关闭已经存在的所有客户端连接
+    // 2. 关闭监听端口
+    server_ctl_mutex_.lock();
+    accept_iter->second->exit = true;
+    auto iter = accept_iter->second->client_conn.begin();
+    auto end_iter = accept_iter->second->client_conn.end();
+    for (; iter != end_iter; ++iter) {
+        sub_reactor_.remove_client_conn(sid, iter->first);
+    }
+    accept_iter->second->acceptor->close();
+    acceptor_.erase(accept_iter);
+    server_ctl_mutex_.unlock();
+
+    return 0;
 }
 
 void* 
@@ -427,7 +401,7 @@ MainReactor::event_wait(void *arg)
             int client_sock_fd = 0;
             socklen_t addrlen = 0;
             struct sockaddr addr;
-            if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0) {
+            if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0 && handle_ptr->exit == false) {
                 ClientConn_t *client_conn_ptr = new ClientConn_t;
                 client_conn_ptr->client_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
                 epoll_ptr->sub_reactor_.add_client_conn(handle_ptr->acceptor->get_socket(), client_conn_ptr);

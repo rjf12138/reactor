@@ -1,1 +1,5 @@
-1. 服务端 accept 和 处理客户端的内容放到两个epoll中处理，不然现在的问题是都在一个epoll中处理，不知道触发的fd是accept的还是客户端的。
+1. 将main_reactor 和 sub_reactor 改成单例模式
+2. server.cc处理消息要比对触发的事件
+3. 处理客户端关闭连接后。sub_reactor 如何处理没用的ClientConn_t
+4. 测试
+5. client.cc中的客户端程序，要继承线程，事件模式使用poll或是select中的一个

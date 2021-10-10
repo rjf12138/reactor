@@ -71,11 +71,19 @@ typedef struct ClientConn {
         client_id = reinterpret_cast<uint64_t>(this);
         client_ptr = new os::SocketTCP();
     }
+
+    ~ClientConn(void) {
+        if (client_ptr != nullptr) {
+            client_ptr->close();
+            delete client_ptr;
+        }
+    }
 } ClientConn_t;
 
 typedef void (*client_conn_func_t)(client_id_t,void*);
 typedef void* (*handle_func_t)(void *);
 typedef struct EventHandle {
+    bool exit;
     server_id_t server_id;
     os::SocketTCP *acceptor;    // 监听套接字连接
 
@@ -88,8 +96,6 @@ typedef struct EventHandle {
     EventHandleState state;     // 事件当前状态
 
     uint32_t events;            // 事件集合
-
-    EventOperation op;          // fd 上要进行的操作
     EventMethod method;         // 哪中类型的event, 目前只有epoll
 
     // 客户端连接时的处理函数

@@ -24,11 +24,11 @@ Server::start(const std::string &ip, int port, ptl::ProtocolType type)
 
     type_ = type;
 
+    handle_.exit = false;
     handle_.server_id = id_;
     handle_.acceptor = &server_;
     handle_.events = EventType_In | EventType_RDHup | EventType_Err;
     handle_.method = EventMethod_Epoll;
-    handle_.op = EventOperation_Add;
     
     handle_.client_arg = this;
     handle_.client_func = client_func;
@@ -45,10 +45,10 @@ Server::close_client(client_id_t id)
 ssize_t 
 Server::send_data(client_id_t id, const ByteBuffer &buff)
 {
-    ClientConn_t* client_ptr = reinterpret_cast<ClientConn_t*>(id);
-    client_ptr->buff_mutex.lock();
-    client_ptr->send_buffer += buff;
-    client_ptr->buff_mutex.unlock();
+    ClientConn_t* server_ptr = reinterpret_cast<ClientConn_t*>(id);
+    server_ptr->buff_mutex.lock();
+    server_ptr->send_buffer += buff;
+    server_ptr->buff_mutex.unlock();
 
     return buff.data_size();
 }
@@ -88,48 +88,49 @@ Server::client_func(void* arg)
         return nullptr;
     }
 
-    Server *client_ptr = (Server*)arg;
+    Server *server_ptr = (Server*)arg;
     ByteBuffer buffer;
 
     int ready_client_sock = 0;
     while (true) {
-        client_ptr->handle_.ready_sock_mutex.lock();
-        int ret = client_ptr->handle_.ready_sock.pop(ready_client_sock);
-        client_ptr->handle_.ready_sock_mutex.unlock();
+        server_ptr->handle_.ready_sock_mutex.lock();
+        int ret = server_ptr->handle_.ready_sock.pop(ready_client_sock);
+        server_ptr->handle_.ready_sock_mutex.unlock();
         if (ret < 0) {
+            server_ptr->handle_.state = EventHandleState_Idle;
             break;
         }
 
-        auto find_iter = client_ptr->handle_.client_conn.find(ready_client_sock);
-        if (find_iter == client_ptr->handle_.client_conn.end()) {
+        auto find_iter = server_ptr->handle_.client_conn.find(ready_client_sock);
+        if (find_iter == server_ptr->handle_.client_conn.end()) {
             LOG_GLOBAL_WARN("Can't find client socket(%d)", ready_client_sock);
             continue;
         }
 
-        client_id_t id = client_ptr->handle_.client_conn[ready_client_sock]->client_id;
-        client_ptr->handle_.client_conn[ready_client_sock]->client_ptr->recv(buffer);
-        if (client_ptr->type_ == ptl::ProtocolType_Raw) {
-            client_ptr->handle_msg(id, buffer);
-        } else if (client_ptr->type_ == ptl::ProtocolType_Http) {
+        client_id_t id = server_ptr->handle_.client_conn[ready_client_sock]->client_id;
+        server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->recv(buffer);
+        if (server_ptr->type_ == ptl::ProtocolType_Raw) {
+            server_ptr->handle_msg(id, buffer);
+        } else if (server_ptr->type_ == ptl::ProtocolType_Http) {
             ptl::HttpPtl http_ptl;
             ptl::HttpParse_ErrorCode err;
             do {
                 err = http_ptl.parse(buffer);
                 if (err == ptl::HttpParse_OK) {
-                    client_ptr->handle_msg(id, http_ptl);
+                    server_ptr->handle_msg(id, http_ptl);
                     http_ptl.clear();
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     //TODO： 协议解析错误时，断开连接
                     buffer.clear();
                 }
             } while (err == ptl::HttpParse_OK);
-        } else if (client_ptr->type_ == ptl::ProtocolType_Websocket) {
+        } else if (server_ptr->type_ == ptl::ProtocolType_Websocket) {
             ptl::WebsocketPtl ws_ptl;
             ptl::WebsocketParse_ErrorCode err;
             do {
                 err = ws_ptl.parse(buffer);
                 if (err == ptl::WebsocketParse_OK) {
-                    client_ptr->handle_msg(id, ws_ptl);
+                    server_ptr->handle_msg(id, ws_ptl);
                     ws_ptl.clear();
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
                     //TODO： 协议解析错误时，断开连接
@@ -137,10 +138,10 @@ Server::client_func(void* arg)
                 }
             } while (err == ptl::WebsocketParse_OK);
         } else {
-            LOG_GLOBAL_WARN("Unknown ptl: %d", client_ptr->type_);
+            LOG_GLOBAL_WARN("Unknown ptl: %d", server_ptr->type_);
         }
     }
-
+    
     return nullptr;
 }
 
