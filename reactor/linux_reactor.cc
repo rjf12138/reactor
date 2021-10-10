@@ -127,26 +127,26 @@ SubReactor::server_register(EventHandle_t *handle_ptr)
         return -1;
     }
 
-    servers_[handle_ptr->acceptor->get_socket()] = handle_ptr;
+    servers_[handle_ptr->server_id] = handle_ptr;
     return 0;
 }
 
 int 
-SubReactor::add_client_conn(int listen_fd, os::SocketTCP *client_ptr)
+SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
 {
-    if (client_ptr == nullptr) {
+    if (client_conn_ptr == nullptr) {
         LOG_ERROR("client_ptr is nullptr");
         return -1;
     }
 
-    auto find_iter = servers_.find(listen_fd);
+    auto find_iter = servers_.find(id);
     if (find_iter == servers_.end()) {
-        LOG_ERROR("Can't find listen fd: %d", listen_fd);
+        LOG_ERROR("Can't find server id: 0x%x", id);
         return -1;
     }
 
-    if (client_ptr->get_socket_state() == false) {
-        LOG_ERROR("get_socket_state: Error client socket state: %d", client_ptr->get_socket());
+    if (client_conn_ptr->client_ptr->get_socket_state() == false) {
+        LOG_ERROR("get_socket_state: Error client socket state: %d", client_conn_ptr->client_ptr->get_socket());
         return -1;
     }
 
@@ -156,20 +156,26 @@ SubReactor::add_client_conn(int listen_fd, os::SocketTCP *client_ptr)
         return -1;
     }
 
-    handle_ptr->client_conn_mutex.lock();
-    handle_ptr->client_conn.push(client_ptr);
-    handle_ptr->client_conn_mutex.unlock();
-
     struct epoll_event ep_events = std_to_epoll_events(handle_ptr->events);
-    ep_events.data.fd = client_ptr->get_socket();
+    ep_events.data.fd = client_conn_ptr->client_ptr->get_socket();
 
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, client_ptr->get_socket(), &ep_events);
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, client_conn_ptr->client_ptr->get_socket(), &ep_events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
+    handle_ptr->client_conn_mutex.lock();
+    handle_ptr->client_conn[client_conn_ptr->client_id] = client_conn_ptr;
+    handle_ptr->client_conn_mutex.unlock();
+
     return 0;
+}
+
+int 
+SubReactor::remove_client_conn(client_id_t id)
+{
+
 }
 
 int 
@@ -417,13 +423,18 @@ MainReactor::event_wait(void *arg)
                 continue;
             }
 
+            EventHandle_t *handle_ptr = find_iter->second;
             int client_sock_fd = 0;
             socklen_t addrlen = 0;
             struct sockaddr addr;
-            if (find_iter->second->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0) {
-                os::SocketTCP *client_ptr = new os::SocketTCP();
-                client_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
-                epoll_ptr->sub_reactor_.add_client_conn(find_iter->second->acceptor->get_socket(), client_ptr);
+            if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0) {
+                ClientConn_t *client_conn_ptr = new ClientConn_t;
+                client_conn_ptr->client_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
+                epoll_ptr->sub_reactor_.add_client_conn(handle_ptr->acceptor->get_socket(), client_conn_ptr);
+
+                if (handle_ptr->client_conn_func != nullptr) {
+                    handle_ptr->client_conn_func(client_conn_ptr->client_id, handle_ptr->client_arg);
+                }
             }
         }
     }

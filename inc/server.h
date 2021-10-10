@@ -17,14 +17,19 @@ public:
     int start(const std::string &ip, int port, ptl::ProtocolType type);
     int stop(void);
 
-    virtual int handle_msg(ByteBuffer &buffer);
-    virtual int handle_msg(ptl::HttpPtl &ptl);
-    virtual int handle_msg(ptl::WebsocketPtl &ptl);
+    int close_client(client_id_t id);
+    ssize_t send_data(client_id_t id, const ByteBuffer &buff);
 
+    virtual int handle_msg(client_id_t id, ByteBuffer &buffer);
+    virtual int handle_msg(client_id_t id, ptl::HttpPtl &ptl);
+    virtual int handle_msg(client_id_t id, ptl::WebsocketPtl &ptl);
+    virtual int handle_client_conn(client_id_t id);
 private:
     static void* client_func(void* arg); // 处理客户端发过来的数据
+    static void client_conn_func(client_id_t id, void* arg); // 客户端连接时的处理函数
 
 private:
+    server_id_t id_;
     EventHandle_t handle_;
 
     ptl::ProtocolType type_;

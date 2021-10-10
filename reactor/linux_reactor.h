@@ -38,9 +38,9 @@ public:
     // 注册服务
     int server_register(EventHandle_t *handle_ptr);
     // 添加新的客户端连接
-    int add_client_conn(int listen_fd, os::SocketTCP *client_ptr);
+    int add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr);
     // 移除客户端连接
-    int remove_client_conn();
+    int remove_client_conn(client_id_t id);
 
     // 事件处理函数
     static void* event_wait(void *arg);

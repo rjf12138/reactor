@@ -8,11 +8,9 @@ namespace reactor {
 // Client 不需要使用reactor,直接使用socket连接到服务器上就行了，只需维护这一条链接
 class Client : public Logger{
 public:
-    Client(EventMethod method = EventMethod_Epoll);
+    Client(void);
     virtual ~Client(void);
-
-    // TCP ===> EventMethod_Epoll
-    // PROC=====>OTHER(目前不支持)
+    
     int connect(const std::string &url);
     int reconnect(void);
     int disconnect(void);

@@ -3,7 +3,7 @@
 
 namespace reactor {
 
-Client::Client(EventMethod method)
+Client::Client(void)
 {
 
 }

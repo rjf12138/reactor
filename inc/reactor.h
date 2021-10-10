@@ -56,12 +56,34 @@ enum EventHandleState {  // 事件当前状态
     EventHandleState_Ready,     // 事件已经触发但是还未处理
     EventHandleState_Handling,  // 正在处理就绪事件
 };
-typedef void* (*handle_func_t)(void *arg);
+
+typedef uint64_t client_id_t;
+typedef uint64_t server_id_t;
+typedef struct ClientConn {
+    client_id_t client_id;
+    os::SocketTCP* client_ptr;
+
+    os::Mutex buff_mutex;
+    ByteBuffer send_buffer;
+    
+    ClientConn(void)
+    :client_ptr(nullptr) {
+        client_id = reinterpret_cast<uint64_t>(this);
+        client_ptr = new os::SocketTCP();
+    }
+} ClientConn_t;
+
+typedef void (*client_conn_func_t)(client_id_t,void*);
+typedef void* (*handle_func_t)(void *);
 typedef struct EventHandle {
+    server_id_t server_id;
     os::SocketTCP *acceptor;    // 监听套接字连接
 
     os::Mutex client_conn_mutex;
-    ds::Queue<os::SocketTCP*> client_conn; // 客户端连接
+    std::map<client_id_t, ClientConn_t*> client_conn; // 客户端连接
+
+    os::Mutex ready_sock_mutex;
+    ds::Queue<int> ready_sock;      // 就绪的客户端描述符列表
 
     EventHandleState state;     // 事件当前状态
 
@@ -73,10 +95,7 @@ typedef struct EventHandle {
     // 客户端连接时的处理函数
     void *client_arg;
     handle_func_t client_func;
-
-    bool is_send_ready;         // buffer 中的数据是不是要发送的
-    ByteBuffer recv_buffer;
-    ByteBuffer send_buffer;
+    client_conn_func_t client_conn_func;
 } EventHandle_t;
 
 class Event : public Logger, public util::MsgObject {
