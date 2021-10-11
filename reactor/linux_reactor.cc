@@ -39,14 +39,14 @@ epoll_events_to_std(uint32_t events)
 //////////////////////////////////////////////////////////////////////////////////////////
 
 MsgHandleCenter *MsgHandleCenter::msg_handle_center_ = nullptr;
-MsgHandleCenter* 
+MsgHandleCenter& 
 MsgHandleCenter::instance(void)
 {
     if (msg_handle_center_ == nullptr) {
         msg_handle_center_ = new MsgHandleCenter();
     }
 
-    return msg_handle_center_;
+    return *msg_handle_center_;
 }
 
 void 
@@ -81,6 +81,30 @@ MsgHandleCenter::add_task(os::Task &task)
     return thread_pool_.add_task(task);
 }
 
+int 
+MsgHandleCenter::add_send_task(ClientConn_t *client_ptr)
+{
+    os::Task task;
+    task.work_func = send_client_data;
+    task.thread_arg = client_ptr;
+
+    return thread_pool_.add_priority_task(task);
+}
+
+void* MsgHandleCenter::send_client_data(void *arg)
+{
+    if (arg == nullptr) {
+        return nullptr;
+    }
+
+    ClientConn_t *client_ptr = reinterpret_cast<ClientConn_t*>(arg);
+    client_ptr->buff_mutex.lock();
+    client_ptr->client_ptr->send(client_ptr->send_buffer);
+    client_ptr->buff_mutex.unlock();
+
+    return nullptr;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 SubReactor::SubReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
@@ -103,7 +127,7 @@ SubReactor::SubReactor(int events_max_size, int timeout)
     task.thread_arg = this;
     task.exit_arg = this;
 
-    MsgHandleCenter::instance()->add_task(task);
+    MsgHandleCenter::instance().add_task(task);
 }
 
 SubReactor::~SubReactor(void)
@@ -245,24 +269,35 @@ SubReactor::event_wait(void *arg)
         }
 
         for (int i = 0; i < ret; ++i) {
-            EventHandle_t *handle_ptr = epoll_ptr->get_event_handle(epoll_ptr->events_[i].data.fd);
+            int ready_socket_fd = epoll_ptr->events_[i].data.fd;
+            EventHandle_t *handle_ptr = epoll_ptr->get_event_handle(ready_socket_fd);
             if (handle_ptr == nullptr) {
-                LOG_GLOBAL_WARN("Cant find EventHandle of socket[%d]", epoll_ptr->events_[i].data.fd);
+                LOG_GLOBAL_WARN("Cant find EventHandle of socket[%d]", ready_socket_fd);
                 continue;
             }
 
-            handle_ptr->ready_sock_mutex.lock();
-            handle_ptr->ready_sock.push(epoll_ptr->events_[i].data.fd);
-            handle_ptr->ready_sock_mutex.unlock();
+            ClientConn_t *conn_ptr = handle_ptr->client_conn[ready_socket_fd];
+            if (epoll_ptr->events_[i].events | EPOLLRDHUP) {
+                LOG_GLOBAL_INFO("Client[%s] closed, remove client", conn_ptr->client_ptr->get_ip_info().c_str());
+                epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
+            } else if (epoll_ptr->events_[i].events | EPOLLERR) {
+                LOG_GLOBAL_WARN("Client[%s] Error, remove client", sock_ptr->get_ip_info().c_str());
+                epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
+            } else if (epoll_ptr->events_[i].events | EPOLLHUP) {
+                LOG_GLOBAL_INFO("Client[%s] closed read", conn_ptr->client_ptr->get_ip_info().c_str());
+            } else {
+                handle_ptr->ready_sock_mutex.lock();
+                handle_ptr->ready_sock.push(ready_socket_fd);
+                if (handle_ptr->state == EventHandleState_Idle) {
+                    handle_ptr->state = EventHandleState_Ready;
 
-            if (handle_ptr->state == EventHandleState_Idle) {
-                handle_ptr->state = EventHandleState_Ready;
+                    os::Task task;
+                    task.work_func = handle_ptr->client_func;
+                    task.thread_arg = handle_ptr->client_arg;
 
-                os::Task task;
-                task.work_func = handle_ptr->client_func;
-                task.thread_arg = handle_ptr->client_arg;
-
-                MsgHandleCenter::instance()->add_task(task);
+                    MsgHandleCenter::instance().add_task(task);
+                }
+                handle_ptr->ready_sock_mutex.unlock();
             }
         }
     }
@@ -285,6 +320,26 @@ SubReactor::event_exit(void *arg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
+MainReactor *MainReactor::s_main_reactor_ptr_ = nullptr;
+
+MainReactor& 
+MainReactor::instance(void)
+{
+    if (s_main_reactor_ptr_ == nullptr) {
+        s_main_reactor_ptr_ = new MainReactor();
+    }
+    return *s_main_reactor_ptr_;
+}
+
+void
+MainReactor::destory(void)
+{
+    if (s_main_reactor_ptr_ != nullptr) {
+        delete s_main_reactor_ptr_;
+        s_main_reactor_ptr_ = nullptr;
+    }
+}
+
 MainReactor::MainReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
   timeout_(timeout),
@@ -306,7 +361,7 @@ MainReactor::MainReactor(int events_max_size, int timeout)
     task.thread_arg = this;
     task.exit_arg = this;
 
-    MsgHandleCenter::instance()->add_task(task);
+    MsgHandleCenter::instance().add_task(task);
 }
 
 MainReactor::~MainReactor(void)
@@ -371,6 +426,12 @@ MainReactor::remove_server_accept(server_id_t sid)
     server_ctl_mutex_.unlock();
 
     return 0;
+}
+
+int 
+MainReactor::remove_client_conn(server_id_t sid, client_id_t cid)
+{
+    return sub_reactor_.remove_client_conn(sid, cid);
 }
 
 void* 

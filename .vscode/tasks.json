@@ -1,0 +1,22 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+        "tasks": [
+            {
+                "type": "shell",
+                "label": "compile script",
+                "command": "project",
+                "args": [
+                    "-r"
+                ],
+                "options": {
+                    "cwd": "/home/ruanjian/workspace/project_v/reactor"
+                },
+                "group": {
+                    "kind": "build",
+                    "isDefault": true
+                }
+            }
+        ],
+        "version": "2.0.0"
+    }

@@ -1,5 +1,5 @@
 #include "server.h"
-
+#include "linux_reactor.h"
 
 namespace reactor {
 
@@ -10,7 +10,7 @@ Server::Server(void)
 
 Server::~Server(void)
 {
-
+    stop();
 }
 
 int 
@@ -33,49 +33,58 @@ Server::start(const std::string &ip, int port, ptl::ProtocolType type)
     handle_.client_arg = this;
     handle_.client_func = client_func;
     handle_.client_conn_func = client_conn_func;
+
+    return MainReactor::instance().add_server_accept(&handle_);
 }
 
+int 
+Server::stop(void)
+{
+    return MainReactor::instance().remove_server_accept(id_);
+}
 
 int 
-Server::close_client(client_id_t id)
+Server::close_client(client_id_t cid)
 {
-
+    return MainReactor::instance().remove_client_conn(id_, cid);
 }
 
 ssize_t 
 Server::send_data(client_id_t id, const ByteBuffer &buff)
 {
-    ClientConn_t* server_ptr = reinterpret_cast<ClientConn_t*>(id);
-    server_ptr->buff_mutex.lock();
-    server_ptr->send_buffer += buff;
-    server_ptr->buff_mutex.unlock();
+    ClientConn_t* client_conn_ptr = reinterpret_cast<ClientConn_t*>(id);
+    client_conn_ptr->buff_mutex.lock();
+    client_conn_ptr->send_buffer += buff;
+    client_conn_ptr->buff_mutex.unlock();
+
+    MsgHandleCenter::instance().add_send_task(client_conn_ptr);
 
     return buff.data_size();
 }
 
 int 
-Server::handle_msg(client_id_t id, ByteBuffer &buffer)
+Server::handle_msg(client_id_t cid, ByteBuffer &buffer)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-Server::handle_msg(client_id_t id, ptl::HttpPtl &ptl)
+Server::handle_msg(client_id_t cid, ptl::HttpPtl &ptl)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-Server::handle_msg(client_id_t id, ptl::WebsocketPtl &ptl)
+Server::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-Server::handle_client_conn(client_id_t id)
+Server::handle_client_conn(client_id_t cid)
 {
     // 如果在客户端连接时需要处理一些事务，可以重载这个函数
     return 0;
@@ -95,11 +104,12 @@ Server::client_func(void* arg)
     while (true) {
         server_ptr->handle_.ready_sock_mutex.lock();
         int ret = server_ptr->handle_.ready_sock.pop(ready_client_sock);
-        server_ptr->handle_.ready_sock_mutex.unlock();
         if (ret < 0) {
             server_ptr->handle_.state = EventHandleState_Idle;
+            server_ptr->handle_.ready_sock_mutex.unlock();
             break;
         }
+        server_ptr->handle_.ready_sock_mutex.unlock();
 
         auto find_iter = server_ptr->handle_.client_conn.find(ready_client_sock);
         if (find_iter == server_ptr->handle_.client_conn.end()) {
@@ -120,8 +130,10 @@ Server::client_func(void* arg)
                     server_ptr->handle_msg(id, http_ptl);
                     http_ptl.clear();
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
-                    //TODO： 协议解析错误时，断开连接
-                    buffer.clear();
+                    // 协议解析错误时，断开连接
+                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, client: %s]", 
+                            server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->get_ip_info().c_str());
+                    server_ptr->close_client(id);
                 }
             } while (err == ptl::HttpParse_OK);
         } else if (server_ptr->type_ == ptl::ProtocolType_Websocket) {
@@ -133,12 +145,15 @@ Server::client_func(void* arg)
                     server_ptr->handle_msg(id, ws_ptl);
                     ws_ptl.clear();
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
-                    //TODO： 协议解析错误时，断开连接
-                    buffer.clear();
+                    // 协议解析错误时，断开连接
+                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: WebSocket, client: %s]", 
+                            server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->get_ip_info().c_str());
+                    server_ptr->close_client(id);
                 }
             } while (err == ptl::WebsocketParse_OK);
         } else {
-            LOG_GLOBAL_WARN("Unknown ptl: %d", server_ptr->type_);
+            LOG_GLOBAL_WARN("[PTL: Unknown, client: %s]", server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->get_ip_info().c_str());
+            server_ptr->close_client(id);
         }
     }
     

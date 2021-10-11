@@ -1,5 +1,1 @@
-1. 将main_reactor 和 sub_reactor 改成单例模式
-2. server.cc处理消息要比对触发的事件
-3. 处理客户端关闭连接后。sub_reactor 如何处理没用的ClientConn_t
-4. 测试
-5. client.cc中的客户端程序，要继承线程，事件模式使用poll或是select中的一个
+1.调试程序

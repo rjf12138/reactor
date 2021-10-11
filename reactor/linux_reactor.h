@@ -7,13 +7,14 @@ namespace reactor {
 
 class MsgHandleCenter {
 public:
-    static MsgHandleCenter* instance(void);
+    static MsgHandleCenter& instance(void);
     static void destory(void);
 
     virtual ~MsgHandleCenter(void);
 
     int set_config(const ReactorConfig_t &config);
     int add_task(os::Task &task);
+    int add_send_task(ClientConn_t *client_ptr);
 
 private:
     MsgHandleCenter(void) {
@@ -22,6 +23,7 @@ private:
         threadpool_config.max_thread_num = 18; // 1个main_reactor, 1个sub_reactor, 16个消息处理线程
     }
     
+    static void* send_client_data(void *arg);
 private:
     static MsgHandleCenter *msg_handle_center_;
 
@@ -67,13 +69,17 @@ private:
 /////////////////////////// 处理客户端的连接 ///////////////////////////////////////////
 class MainReactor : public Logger {
 public:
-    MainReactor(int events_max_size_ = 32, int timeout = 3000);
+    static MainReactor& instance(void);
+    static void destory(void);
+
     virtual ~MainReactor(void);
 
     // 添加服务端监听连接
     int add_server_accept(EventHandle_t *handle_ptr);
     // 删除服务端监听连接
     int remove_server_accept(server_id_t sid);
+    // 移除客户端连接
+    int remove_client_conn(server_id_t sid, client_id_t cid);
 
     // 事件处理函数
     static void* event_wait(void *arg);
@@ -82,6 +88,10 @@ public:
     // 发送返回的消息
     static void* event_send(void *arg); 
 
+private:
+    MainReactor(int events_max_size_ = 32, int timeout = 3000);
+    MainReactor(const MainReactor &) = delete;
+    MainReactor& operator=(const MainReactor&) = delete;
 private:
     bool exit_;
     int epfd_;
@@ -94,6 +104,8 @@ private:
 
     os::Mutex server_ctl_mutex_;
     std::map<server_id_t, EventHandle_t*> acceptor_;
+
+    static MainReactor *s_main_reactor_ptr_;
 };
 
 
