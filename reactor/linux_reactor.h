@@ -18,9 +18,6 @@ public:
 
 private:
     MsgHandleCenter(void) {
-        os::ThreadPoolConfig threadpool_config = thread_pool_.get_threadpool_config();
-        threadpool_config.min_thread_num = 6;  // 1个main_reactor, 1个sub_reactor, 4个消息处理线程
-        threadpool_config.max_thread_num = 18; // 1个main_reactor, 1个sub_reactor, 16个消息处理线程
     }
     
     static void* send_client_data(void *arg);

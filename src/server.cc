@@ -1,20 +1,20 @@
-#include "server.h"
+#include "reactor.h"
 #include "linux_reactor.h"
 
 namespace reactor {
 
-Server::Server(void)
+NetServer::NetServer(void)
 {
     id_ = reinterpret_cast<server_id_t>(this);
 }
 
-Server::~Server(void)
+NetServer::~NetServer(void)
 {
     stop();
 }
 
 int 
-Server::start(const std::string &ip, int port, ptl::ProtocolType type)
+NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
 {
     int ret = server_.create_socket(ip, port);
     if (ret < 0) {
@@ -38,19 +38,19 @@ Server::start(const std::string &ip, int port, ptl::ProtocolType type)
 }
 
 int 
-Server::stop(void)
+NetServer::stop(void)
 {
     return MainReactor::instance().remove_server_accept(id_);
 }
 
 int 
-Server::close_client(client_id_t cid)
+NetServer::close_client(client_id_t cid)
 {
     return MainReactor::instance().remove_client_conn(id_, cid);
 }
 
 ssize_t 
-Server::send_data(client_id_t id, const ByteBuffer &buff)
+NetServer::send_data(client_id_t id, const ByteBuffer &buff)
 {
     ClientConn_t* client_conn_ptr = reinterpret_cast<ClientConn_t*>(id);
     client_conn_ptr->buff_mutex.lock();
@@ -63,41 +63,41 @@ Server::send_data(client_id_t id, const ByteBuffer &buff)
 }
 
 int 
-Server::handle_msg(client_id_t cid, ByteBuffer &buffer)
+NetServer::handle_msg(client_id_t cid, ByteBuffer &buffer)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-Server::handle_msg(client_id_t cid, ptl::HttpPtl &ptl)
+NetServer::handle_msg(client_id_t cid, ptl::HttpPtl &ptl)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-Server::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl)
+NetServer::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-Server::handle_client_conn(client_id_t cid)
+NetServer::handle_client_conn(client_id_t cid)
 {
     // 如果在客户端连接时需要处理一些事务，可以重载这个函数
     return 0;
 }
 
 void* 
-Server::client_func(void* arg)
+NetServer::client_func(void* arg)
 {
     if (arg == nullptr) {
         return nullptr;
     }
 
-    Server *server_ptr = (Server*)arg;
+    NetServer *server_ptr = (NetServer*)arg;
     ByteBuffer buffer;
 
     int ready_client_sock = 0;
@@ -161,14 +161,14 @@ Server::client_func(void* arg)
 }
 
 void 
-Server::client_conn_func(client_id_t id, void* arg)
+NetServer::client_conn_func(client_id_t id, void* arg)
 {
     if (arg == nullptr) {
         LOG_GLOBAL_WARN("arg is nullptr");
         return;
     }
 
-    Server* server_ptr = reinterpret_cast<Server*>(arg);
+    NetServer* server_ptr = reinterpret_cast<NetServer*>(arg);
     server_ptr->handle_client_conn(id);
 
     return;

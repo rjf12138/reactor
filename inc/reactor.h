@@ -1,91 +1,68 @@
 #ifndef __REACTOR_H__
 #define __REACTOR_H__
 
-#include "basic/logger.h"
-#include "data_structure/queue.h"
+#include "basic/basic_head.h"
 #include "basic/byte_buffer.h"
+#include "basic/logger.h"
+#include "protocol/protocol.h"
 #include "system/system.h"
 #include "util/util.h"
+#include "reactor_define.h"
 
 namespace reactor {
-using namespace basic;
-enum EventMethod {
-    EventMethod_Unknown,
-    EventMethod_Epoll,
-};
-
-enum EventType {
-    EventType_In    = 0x001,    // 数据可读
-    EventType_Pri   = 0x002,    // 高优先级数据可读，比如TCP带外数据
-    EventType_Out   = 0x004,    // 数据可写
-    EventType_RDHup = 0x008,    // 连接被对方关闭，或者对方关闭了写操作
-    EventType_Err   = 0x010,    // 错误
-    EventType_Hup   = 0x020,    // 挂起。比如管道写端关闭后，读端描述符上将收到POLLHUP事件
-};
-
-enum EventOperation {
-    EventOperation_Add = 1, // 往事件上注册fd
-    EventOperation_Mod = 2, // 修改事件上的fd
-    EventOperation_Del = 3  // 删除事件上的fd
-};
-
-enum EventHandleState {  // 事件当前状态
-    EventHandleState_Idle,      // 未触发任何事件
-    EventHandleState_Ready,     // 事件已经触发但是还未处理
-    EventHandleState_Handling,  // 正在处理就绪事件
-};
-
-typedef uint64_t client_id_t;
-typedef uint64_t server_id_t;
-typedef struct ClientConn {
-    client_id_t client_id;
-    os::SocketTCP* client_ptr;
-
-    os::Mutex buff_mutex;
-    ByteBuffer send_buffer;
+///////////////////////// 客户端类 /////////////////////////
+class NetClient : public basic::Logger{
+public:
+    NetClient(void);
+    virtual ~NetClient(void);
     
-    ClientConn(void)
-    :client_ptr(nullptr) {
-        client_id = reinterpret_cast<uint64_t>(this);
-        client_ptr = new os::SocketTCP();
-    }
+    int connect(const std::string &url);
+    int reconnect(void);
+    int disconnect(void);
 
-    ~ClientConn(void) {
-        if (client_ptr != nullptr) {
-            client_ptr->close();
-            delete client_ptr;
-        }
-    }
-} ClientConn_t;
+    virtual int handle_msg(basic::ByteBuffer &buffer);
+    virtual int handle_msg(ptl::HttpPtl &ptl);
+    virtual int handle_msg(ptl::WebsocketPtl &ptl);
 
-typedef void (*client_conn_func_t)(client_id_t,void*);
-typedef void* (*handle_func_t)(void *);
-typedef struct EventHandle {
-    bool exit;
-    server_id_t server_id;
-    os::SocketTCP *acceptor;    // 监听套接字连接
+private:
+    int connect_v();
+    static void* client_func(void* arg);// arg: EventHandle_t
 
-    os::Mutex client_conn_mutex;
-    std::map<client_id_t, ClientConn_t*> client_conn; // 客户端连接
+private:
+    os::SocketTCP socket_;
+    ptl::URLParser url_parser_;
+};
 
-    os::Mutex ready_sock_mutex;
-    ds::Queue<int> ready_sock;      // 就绪的客户端描述符列表
+///////////////////// 服务端类 //////////////////////////////
+class NetServer : public basic::Logger, public util::MsgObject {
+public:
+    NetServer(void);
+    virtual ~NetServer(void);
 
-    EventHandleState state;     // 事件当前状态
+    int start(const std::string &ip, int port, ptl::ProtocolType type);
+    int stop(void);
 
-    uint32_t events;            // 事件集合
-    EventMethod method;         // 哪中类型的event, 目前只有epoll
+    int close_client(client_id_t cid);
+    ssize_t send_data(client_id_t cid, const ByteBuffer &buff);
 
-    // 客户端连接时的处理函数
-    void *client_arg;
-    handle_func_t client_func;
-    client_conn_func_t client_conn_func;
-} EventHandle_t;
+    virtual int handle_msg(client_id_t cid, ByteBuffer &buffer);
+    virtual int handle_msg(client_id_t cid, ptl::HttpPtl &ptl);
+    virtual int handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl);
+    virtual int handle_client_conn(client_id_t cid);
 
-#ifdef __RJF_LINUX__
-#include "linux_reactor.h"
-#elif defined(__RJF_WINDOWS__)
-#endif
+    // 消息收到时回调函数
+    virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
+private:
+    static void* client_func(void* arg); // 处理客户端发过来的数据
+    static void client_conn_func(client_id_t id, void* arg); // 客户端连接时的处理函数
+
+private:
+    server_id_t id_;
+    EventHandle_t handle_;
+
+    ptl::ProtocolType type_;
+    os::SocketTCP server_;
+};
 }
 
 #endif

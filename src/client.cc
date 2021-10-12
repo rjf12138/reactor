@@ -1,20 +1,19 @@
-#include "client.h"
-#include "url_parser.h"
+#include "reactor.h"
 
 namespace reactor {
 
-Client::Client(void)
+NetClient::NetClient(void)
 {
 
 }
 
-Client::~Client(void)
+NetClient::~NetClient(void)
 {
-
+    disconnect();
 }
 
 int
-Client::connect_v(void)
+NetClient::connect_v(void)
 {
     socket_.create_socket(url_parser_.addr_, url_parser_.port_);
     if (socket_.get_socket_state() == false) {
@@ -26,7 +25,7 @@ Client::connect_v(void)
 }
 
 int 
-Client::connect(const std::string &url)
+NetClient::connect(const std::string &url)
 {
     url_parser_.clear();
     int ret = url_parser_.parser(url);
@@ -39,43 +38,48 @@ Client::connect(const std::string &url)
 }
 
 int 
-Client::reconnect(void)
+NetClient::reconnect(void)
 {
     return connect_v();
 }
 
 int 
-Client::disconnect(void)
+NetClient::disconnect(void)
 {
     return socket_.close();
 }
 
 int 
-Client::handle_msg(ByteBuffer &buffer)
+NetClient::handle_msg(ByteBuffer &buffer)
 {
     return 0;
 }
 
 int 
-Client::handle_msg(ptl::HttpPtl &ptl)
+NetClient::handle_msg(ptl::HttpPtl &ptl)
 {
     return 0;
 }
 
 int 
-Client::handle_msg(ptl::WebsocketPtl &ptl)
+NetClient::handle_msg(ptl::WebsocketPtl &ptl)
 {
     return 0;
 }
 
 void* 
-Client::client_func(void* arg)
+NetClient::client_func(void* arg)
 {
     if (arg == nullptr) {
         return nullptr;
     }
 
-    Client *client_ptr = (Client*)arg;
+    NetClient *client_ptr = (NetClient*)arg;
+    if (client_ptr->socket_.get_socket_state() == false) {
+        LOG_GLOBAL_WARN("Client socket[%s] closed." client_ptr->socket_.get_ip_info().c_str());
+        return nullptr;
+    }
+
     ByteBuffer buffer;
     client_ptr->socket_.recv(buffer);
     if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Raw) {
@@ -89,8 +93,7 @@ Client::client_func(void* arg)
                 client_ptr->handle_msg(http_ptl);
                 http_ptl.clear();
             } else if (err != ptl::HttpParse_ContentNotEnough) {
-                //TODO： 协议解析错误时，断开连接
-                buffer.clear();
+                client_ptr->disconnect();
             }
         } while (err == ptl::HttpParse_OK);
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Websocket) {
@@ -102,8 +105,7 @@ Client::client_func(void* arg)
                 client_ptr->handle_msg(ws_ptl);
                 ws_ptl.clear();
             } else if (err != ptl::WebsocketParse_PacketNotEnough) {
-                //TODO： 协议解析错误时，断开连接
-                buffer.clear();
+                client_ptr->disconnect();
             }
         } while (err == ptl::WebsocketParse_OK);
     } else {

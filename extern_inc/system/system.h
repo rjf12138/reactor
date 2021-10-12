@@ -49,8 +49,11 @@ public:
     Time(void);
     ~Time(void);
 
+    // 设置时间
+    void set_time(mtime_t tm);
+
     // 获取当前时间
-    mtime_t now(void);
+    static mtime_t now(void);
     // 格式化当前时间
     std::string format(bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
 
@@ -69,6 +72,17 @@ public:
 
 private:
     mtime_t time_;
+};
+/////////////////////////////// 获取系统信息 ////////////////////////////////////////
+class SystemInfo {
+public:
+    SystemInfo(void);
+    ~SystemInfo(void);
+
+    // 获取当前用户可以使用的 cpu 核心数 
+    static int get_nprocs(void);
+    // 获取 cpu 总的核心数
+    static int get_nprocs_conf(void);
 };
 
 /////////////////////////////// 互斥量 /////////////////////////////////////////////
