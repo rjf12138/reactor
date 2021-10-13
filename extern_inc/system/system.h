@@ -385,7 +385,8 @@ public:
     
     // 获取socket信息
     int get_socket(void);
-    std::string get_ip_info(std::string &ip, uint16_t &port);
+    int get_ip_info(std::string &ip, uint16_t &port);
+    std::string get_ip_info(void);
     bool get_socket_state(void) const {return is_enable_;}
 
     // 关闭套接字

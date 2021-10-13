@@ -29,7 +29,12 @@ private:
     static void* client_func(void* arg);// arg: EventHandle_t
 
 private:
-    os::SocketTCP socket_;
+    server_id_t sid_;
+    client_id_t cid_;
+    ClientConn_t *client_conn_ptr_;
+    EventHandle_t handle_;
+
+    std::string url_;
     ptl::URLParser url_parser_;
 };
 

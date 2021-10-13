@@ -1,2 +1,2 @@
-1. server socket设置非阻塞
-2. client 线程循环监听接收， 发送数据
+1. 添加 websocket 连接流程
+2. 完成测试程序

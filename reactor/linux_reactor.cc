@@ -106,6 +106,13 @@ void* MsgHandleCenter::send_client_data(void *arg)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
+SubReactor& 
+SubReactor::instance(void)
+{
+    static SubReactor s_sub_reactor_;
+    return s_sub_reactor_;
+}
+
 SubReactor::SubReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
   timeout_(timeout),
@@ -226,6 +233,7 @@ SubReactor::remove_client_conn(server_id_t sid, client_id_t cid)
     EventHandle_t *handle_ptr = find_iter->second;
     auto client_iter = handle_ptr->client_conn.find(cid);
     if (client_iter == handle_ptr->client_conn.end()) {
+        LOG_ERROR("Can't find client id: 0x%x", cid);
         return 0;
     }
 
@@ -320,24 +328,11 @@ SubReactor::event_exit(void *arg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-MainReactor *MainReactor::s_main_reactor_ptr_ = nullptr;
-
 MainReactor& 
 MainReactor::instance(void)
 {
-    if (s_main_reactor_ptr_ == nullptr) {
-        s_main_reactor_ptr_ = new MainReactor();
-    }
-    return *s_main_reactor_ptr_;
-}
-
-void
-MainReactor::destory(void)
-{
-    if (s_main_reactor_ptr_ != nullptr) {
-        delete s_main_reactor_ptr_;
-        s_main_reactor_ptr_ = nullptr;
-    }
+    static MainReactor s_main_reactor_;
+    return s_main_reactor_;
 }
 
 MainReactor::MainReactor(int events_max_size, int timeout)
@@ -396,7 +391,7 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
 
     server_ctl_mutex_.lock();
     acceptor_[handle_ptr->server_id] = handle_ptr;
-    sub_reactor_.server_register(handle_ptr);
+    SubReactor::instance().server_register(handle_ptr);
     server_ctl_mutex_.unlock();
 
     return 0;
@@ -419,7 +414,7 @@ MainReactor::remove_server_accept(server_id_t sid)
     auto iter = accept_iter->second->client_conn.begin();
     auto end_iter = accept_iter->second->client_conn.end();
     for (; iter != end_iter; ++iter) {
-        sub_reactor_.remove_client_conn(sid, iter->first);
+        SubReactor::instance().remove_client_conn(sid, iter->first);
     }
     accept_iter->second->acceptor->close();
     acceptor_.erase(accept_iter);
@@ -431,7 +426,7 @@ MainReactor::remove_server_accept(server_id_t sid)
 int 
 MainReactor::remove_client_conn(server_id_t sid, client_id_t cid)
 {
-    return sub_reactor_.remove_client_conn(sid, cid);
+    return SubReactor::instance().remove_client_conn(sid, cid);
 }
 
 void* 
@@ -465,7 +460,7 @@ MainReactor::event_wait(void *arg)
             if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0 && handle_ptr->exit == false) {
                 ClientConn_t *client_conn_ptr = new ClientConn_t;
                 client_conn_ptr->client_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
-                epoll_ptr->sub_reactor_.add_client_conn(handle_ptr->acceptor->get_socket(), client_conn_ptr);
+                SubReactor::instance().add_client_conn(handle_ptr->acceptor->get_socket(), client_conn_ptr);
 
                 if (handle_ptr->client_conn_func != nullptr) {
                     handle_ptr->client_conn_func(client_conn_ptr->client_id, handle_ptr->client_arg);

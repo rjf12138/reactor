@@ -17,8 +17,7 @@ public:
     int add_send_task(ClientConn_t *client_ptr);
 
 private:
-    MsgHandleCenter(void) {
-    }
+    MsgHandleCenter(void) {}
     
     static void* send_client_data(void *arg);
 private:
@@ -31,7 +30,9 @@ private:
 //////////////////////////// 处理客户端的数据 ////////////////////////////////////////////
 class SubReactor : public Logger {
 public:
-    SubReactor(int events_max_size_ = 32, int timeout = 3000);
+    static SubReactor& instance(void);
+    static void destory(void);
+
     virtual ~SubReactor(void);
 
     // 注册服务
@@ -50,6 +51,10 @@ public:
 
 private:
     inline EventHandle_t* get_event_handle(int client_sock);
+
+    SubReactor(int events_max_size_ = 32, int timeout = 3000);
+    SubReactor(const SubReactor &) = delete;
+    SubReactor& operator=(const SubReactor&) = delete;
 
 private:
     bool exit_;
@@ -89,6 +94,7 @@ private:
     MainReactor(int events_max_size_ = 32, int timeout = 3000);
     MainReactor(const MainReactor &) = delete;
     MainReactor& operator=(const MainReactor&) = delete;
+
 private:
     bool exit_;
     int epfd_;
@@ -97,12 +103,8 @@ private:
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
 
-    SubReactor sub_reactor_;
-
     os::Mutex server_ctl_mutex_;
     std::map<server_id_t, EventHandle_t*> acceptor_;
-
-    static MainReactor *s_main_reactor_ptr_;
 };
 
 
