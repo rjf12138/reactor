@@ -4,6 +4,7 @@
 namespace reactor {
 
 NetClient::NetClient(void)
+:ws_state_(WSConnectState_Dissconnect)
 {
     sid_ = reinterpret_cast<server_id_t>(this);
 }
@@ -11,12 +12,6 @@ NetClient::NetClient(void)
 NetClient::~NetClient(void)
 {
     disconnect();
-}
-
-int
-NetClient::connect_v(void)
-{
-    
 }
 
 int 
@@ -83,6 +78,19 @@ NetClient::disconnect(void)
     return SubReactor::instance().remove_client_conn(sid_, cid_);
 }
 
+ssize_t 
+NetClient::send_data(const ByteBuffer &buff)
+{
+    ClientConn_t* client_conn_ptr = reinterpret_cast<ClientConn_t*>(cid_);
+    client_conn_ptr->buff_mutex.lock();
+    client_conn_ptr->send_buffer += buff;
+    client_conn_ptr->buff_mutex.unlock();
+
+    MsgHandleCenter::instance().add_send_task(client_conn_ptr);
+
+    return buff.data_size();
+}
+
 int 
 NetClient::handle_msg(ByteBuffer &buffer)
 {
@@ -99,6 +107,18 @@ int
 NetClient::handle_msg(ptl::WebsocketPtl &ptl)
 {
     return 0;
+}
+
+int
+NetClient::ws_upgrade_request(basic::ByteBuffer &content)
+{
+    ws_ptl_.get_upgrade_packet(http_ptl_, content, url_parser_.res_path_);
+
+    basic::ByteBuffer buffer;
+    http_ptl_.generate(buffer);
+
+    ws_state_ = WSConnectState_UpgradePtl;
+    return send_data(buffer);
 }
 
 void* 
@@ -140,20 +160,46 @@ NetClient::client_func(void* arg)
             }
         } while (err == ptl::HttpParse_OK);
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Websocket) {
-        ptl::WebsocketPtl ws_ptl;
-        ptl::WebsocketParse_ErrorCode err;
-        do {
-            err = ws_ptl.parse(buffer);
-            if (err == ptl::WebsocketParse_OK) {
-                client_ptr->handle_msg(ws_ptl);
-                ws_ptl.clear();
-            } else if (err != ptl::WebsocketParse_PacketNotEnough) {
-                // 协议解析错误时，断开连接
-                LOG_GLOBAL_WARN("Parse client send data failed[PTL: Websocket, server: %s]", 
-                        socket_ptr->get_ip_info().c_str());
-                client_ptr->disconnect();
-            }
-        } while (err == ptl::WebsocketParse_OK);
+        switch (client_ptr->ws_state_)
+        {
+        case WSConnectState_UpgradePtl: {
+            ptl::HttpParse_ErrorCode err;
+            do {
+                err = client_ptr->http_ptl_.parse(buffer);
+                if (err == ptl::HttpParse_OK) {
+                    int ret = client_ptr->ws_ptl_.check_upgrade_response(client_ptr->http_ptl_);
+                    if (ret == -1) {
+                        // 协议升级失败，断开连接
+                        LOG_GLOBAL_WARN("Upgrade to websocket failed[PTL: HTTP, server: %s]", 
+                            socket_ptr->get_ip_info().c_str());
+                        client_ptr->disconnect();
+                    }
+                } else if (err != ptl::HttpParse_ContentNotEnough) {
+                    // 协议解析错误时，断开连接
+                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
+                            socket_ptr->get_ip_info().c_str());
+                    client_ptr->disconnect();
+                }
+            } while (err == ptl::HttpParse_OK);
+        } break;
+        case WSConnectState_Connected: {
+            ptl::WebsocketParse_ErrorCode err;
+            do {
+                err = client_ptr->ws_ptl_.parse(buffer);
+                if (err == ptl::WebsocketParse_OK) {
+                    client_ptr->handle_msg(client_ptr->ws_ptl_);
+                    client_ptr->ws_ptl_.clear();
+                } else if (err != ptl::WebsocketParse_PacketNotEnough) {
+                    // 协议解析错误时，断开连接
+                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: Websocket, server: %s]", 
+                            socket_ptr->get_ip_info().c_str());
+                    client_ptr->disconnect();
+                }
+            } while (err == ptl::WebsocketParse_OK);
+        } break;
+        default:
+            break;
+        }
     } else {
         LOG_GLOBAL_WARN("Unknown ptl: %d", client_ptr->url_parser_.type_);
     }

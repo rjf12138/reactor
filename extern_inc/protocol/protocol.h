@@ -134,6 +134,8 @@ public:
     int get_upgrade_packet(HttpPtl &request, basic::ByteBuffer &content, std::string url = "/", std::string host = "websocket client");
     // 服务端回复客户端的请求
     int response_upgrade_packet(HttpPtl &request, HttpPtl &response, basic::ByteBuffer &content, std::string host = "websocket server");
+    // 检查服务端请求是否正确
+    int check_upgrade_response(HttpPtl &response);
 
     // 获取消息内容
     basic::ByteBuffer& get_content(void);
@@ -154,6 +156,7 @@ public:
 private:
     int generate_sec_websocket_key(basic::ByteBuffer &out);
     int generate_sec_websocket_accept(basic::ByteBuffer &sec_key);
+
 private:
     int8_t fin_;
     basic::ByteBuffer sec_websocket_accept_;

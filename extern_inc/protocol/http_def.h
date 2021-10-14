@@ -14,10 +14,12 @@
 #define HTTP_METHOD_RESPONE     HTTP_VERSION
 
 // http 返回状态
+// 状态码 1XX:
+#define HTTP_STATUS_SwitchingProtocols  101     // 服务器根据客户端的请求切换协议。只能切换到更高级的协议
 // 状态码 2XX： 表明请求被正常处理了
-#define HTTP_STATUS_OK              200         //正常请求
-#define HTTP_STATUS_NoContent       204         //处理成功，但是没有资源返回
-#define HTTP_STATUS_PartialContent  206         //客户端进行范围请求，服务器成功执行了，Content-Range 指定范围的实体内容
+#define HTTP_STATUS_OK              200         // 正常请求
+#define HTTP_STATUS_NoContent       204         // 处理成功，但是没有资源返回
+#define HTTP_STATUS_PartialContent  206         // 客户端进行范围请求，服务器成功执行了，Content-Range 指定范围的实体内容
 // 状态码 3XX： 表明浏览器需要执行某些特殊的处理以正确处理请求
 #define HTTP_STATUS_MovedPermanently 301        // 永久性重定向。该状态码表示请求的资源已被分配了新的 URI
 #define HTTP_STATUS_Found            302        // 临时性重定向。该状态码表示请求的资源已被分配了新的 URI,希望用户(本次)能使用新的 URI 访问 

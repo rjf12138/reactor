@@ -11,6 +11,11 @@
 
 namespace reactor {
 ///////////////////////// 客户端类 /////////////////////////
+enum WSConnectState {
+    WSConnectState_Dissconnect,
+    WSConnectState_UpgradePtl,
+    WSConnectState_Connected,
+};
 class NetClient : public basic::Logger{
 public:
     NetClient(void);
@@ -20,19 +25,30 @@ public:
     int reconnect(void);
     int disconnect(void);
 
+    ssize_t send_data(const ByteBuffer &buff);
+
     virtual int handle_msg(basic::ByteBuffer &buffer);
     virtual int handle_msg(ptl::HttpPtl &ptl);
     virtual int handle_msg(ptl::WebsocketPtl &ptl);
 
 private:
-    int connect_v();
     static void* client_func(void* arg);// arg: EventHandle_t
+
+    // 发送 websocket 协议升级请求
+    int ws_upgrade_request(basic::ByteBuffer &content);
+    // 处理 websocket 协议升级回复
+    int handle_ws_upgrade_response(ptl::HttpPtl &ptl);
 
 private:
     server_id_t sid_;
     client_id_t cid_;
     ClientConn_t *client_conn_ptr_;
     EventHandle_t handle_;
+
+    ptl::HttpPtl http_ptl_;
+
+    WSConnectState ws_state_;
+    ptl::WebsocketPtl ws_ptl_;
 
     std::string url_;
     ptl::URLParser url_parser_;
