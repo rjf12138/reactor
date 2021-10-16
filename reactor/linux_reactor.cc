@@ -289,7 +289,7 @@ SubReactor::event_wait(void *arg)
                 LOG_GLOBAL_INFO("Client[%s] closed, remove client", conn_ptr->client_ptr->get_ip_info().c_str());
                 epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
             } else if (epoll_ptr->events_[i].events | EPOLLERR) {
-                LOG_GLOBAL_WARN("Client[%s] Error, remove client", sock_ptr->get_ip_info().c_str());
+                LOG_GLOBAL_WARN("Client[%s] Error, remove client", conn_ptr->client_ptr->get_ip_info().c_str());
                 epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
             } else if (epoll_ptr->events_[i].events | EPOLLHUP) {
                 LOG_GLOBAL_INFO("Client[%s] closed read", conn_ptr->client_ptr->get_ip_info().c_str());

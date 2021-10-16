@@ -11,11 +11,12 @@
 
 namespace reactor {
 ///////////////////////// 客户端类 /////////////////////////
-enum WSConnectState {
-    WSConnectState_Dissconnect,
-    WSConnectState_UpgradePtl,
-    WSConnectState_Connected,
+enum NetConnectState {
+    NetConnectState_Dissconnected,
+    NetConnectState_UpgradePtl,
+    NetConnectState_Connected,
 };
+
 class NetClient : public basic::Logger{
 public:
     NetClient(void);
@@ -25,19 +26,18 @@ public:
     int reconnect(void);
     int disconnect(void);
 
-    ssize_t send_data(const ByteBuffer &buff);
+    NetConnectState get_state(void);
+    void set_state(NetConnectState state) {state_ = state;}
 
+    ssize_t send_data(const ByteBuffer &buff);
     virtual int handle_msg(basic::ByteBuffer &buffer);
-    virtual int handle_msg(ptl::HttpPtl &ptl);
-    virtual int handle_msg(ptl::WebsocketPtl &ptl);
 
 private:
     static void* client_func(void* arg);// arg: EventHandle_t
 
-    // 发送 websocket 协议升级请求
-    int ws_upgrade_request(basic::ByteBuffer &content);
-    // 处理 websocket 协议升级回复
-    int handle_ws_upgrade_response(ptl::HttpPtl &ptl);
+protected:
+    std::string url_;
+    ptl::URLParser url_parser_;
 
 private:
     server_id_t sid_;
@@ -45,13 +45,49 @@ private:
     ClientConn_t *client_conn_ptr_;
     EventHandle_t handle_;
 
+    NetConnectState state_;
+};
+
+class HttpNetClient : public NetClient {
+public:
+    HttpNetClient(void);
+    virtual ~HttpNetClient(void);
+
+    int connect(const std::string &url, const basic::ByteBuffer &content);
+    int disconnect(void);
+
+    ssize_t send_data(ptl::HttpPtl &http_ptl);
+
+    virtual int handle_msg(ptl::HttpPtl &http_ptl);
+
+private:
     ptl::HttpPtl http_ptl_;
+};
 
-    WSConnectState ws_state_;
+class WSNetClient : public NetClient {
+public:
+    WSNetClient(bool heartbeat = false, int heartbeat_time = 30);
+    virtual ~WSNetClient(void);
+
+    int connect(const std::string &url, basic::ByteBuffer &content);
+    int disconnect(void);
+
+    ssize_t send_data(basic::ByteBuffer &content, int opcode, bool is_mask = false);
+
+    virtual int handle_msg(ptl::WebsocketPtl &ptl);
+
+private:
+    int handle_msg(ptl::HttpPtl &http_ptl);
+
+    // 发送 websocket 协议升级请求
+    int ws_upgrade_request(basic::ByteBuffer &content);
+    // 处理 websocket 协议升级回复
+    int handle_ws_upgrade_response(ptl::HttpPtl &ptl);
+
+private:
+    bool is_heartbeat_;
+    int heartbeat_time_;
     ptl::WebsocketPtl ws_ptl_;
-
-    std::string url_;
-    ptl::URLParser url_parser_;
 };
 
 ///////////////////// 服务端类 //////////////////////////////

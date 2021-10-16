@@ -4,7 +4,6 @@
 namespace reactor {
 
 NetClient::NetClient(void)
-:ws_state_(WSConnectState_Dissconnect)
 {
     sid_ = reinterpret_cast<server_id_t>(this);
 }
@@ -17,6 +16,11 @@ NetClient::~NetClient(void)
 int 
 NetClient::connect(const std::string &url)
 {
+    if (state_ != NetConnectState_Dissconnected) {
+        LOG_WARN("Client already connect other server[%s: %d]", url_parser_.addr_, url_parser_.port_);
+        return -1;
+    }
+
     url_ = url;
     url_parser_.clear();
     int ret = url_parser_.parser(url);
@@ -62,6 +66,8 @@ NetClient::connect(const std::string &url)
     cid_ = client_conn_ptr->client_id;
     client_conn_ptr_ = client_conn_ptr;
 
+    state_ = NetConnectState_Connected;
+
     return ret;
 }
 
@@ -74,13 +80,29 @@ NetClient::reconnect(void)
 int 
 NetClient::disconnect(void)
 {
-    client_conn_ptr_ = nullptr;
-    return SubReactor::instance().remove_client_conn(sid_, cid_);
+    if (state_ != NetConnectState_Dissconnected) {
+        state_ = NetConnectState_Dissconnected;
+        client_conn_ptr_ = nullptr;
+        return SubReactor::instance().remove_client_conn(sid_, cid_);
+    }
+
+    return 0;
+}
+
+NetConnectState 
+NetClient::get_state(void)
+{
+    return state_;
 }
 
 ssize_t 
 NetClient::send_data(const ByteBuffer &buff)
 {
+    if (state_ == NetConnectState_Dissconnected) {
+        LOG_WARN("Client not connect any server.");
+        return -1;
+    }
+
     ClientConn_t* client_conn_ptr = reinterpret_cast<ClientConn_t*>(cid_);
     client_conn_ptr->buff_mutex.lock();
     client_conn_ptr->send_buffer += buff;
@@ -95,30 +117,6 @@ int
 NetClient::handle_msg(ByteBuffer &buffer)
 {
     return 0;
-}
-
-int 
-NetClient::handle_msg(ptl::HttpPtl &ptl)
-{
-    return 0;
-}
-
-int 
-NetClient::handle_msg(ptl::WebsocketPtl &ptl)
-{
-    return 0;
-}
-
-int
-NetClient::ws_upgrade_request(basic::ByteBuffer &content)
-{
-    ws_ptl_.get_upgrade_packet(http_ptl_, content, url_parser_.res_path_);
-
-    basic::ByteBuffer buffer;
-    http_ptl_.generate(buffer);
-
-    ws_state_ = WSConnectState_UpgradePtl;
-    return send_data(buffer);
 }
 
 void* 
@@ -147,53 +145,60 @@ NetClient::client_func(void* arg)
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Http) {
         ptl::HttpPtl http_ptl;
         ptl::HttpParse_ErrorCode err;
+        HttpNetClient* http_client_ptr = dynamic_cast<HttpNetClient*>(client_ptr);
+
         do {
             err = http_ptl.parse(buffer);
             if (err == ptl::HttpParse_OK) {
-                client_ptr->handle_msg(http_ptl);
+                http_client_ptr->handle_msg(http_ptl);
                 http_ptl.clear();
             } else if (err != ptl::HttpParse_ContentNotEnough) {
                 // 协议解析错误时，断开连接
                 LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
                         socket_ptr->get_ip_info().c_str());
-                client_ptr->disconnect();
+                http_client_ptr->disconnect();
             }
         } while (err == ptl::HttpParse_OK);
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Websocket) {
-        switch (client_ptr->ws_state_)
+        ptl::HttpPtl http_ptl;
+        ptl::HttpParse_ErrorCode err;
+        ptl::WebsocketPtl ws_ptl;
+        WSNetClient* ws_client_ptr = dynamic_cast<WSNetClient*>(client_ptr);
+
+        switch (client_ptr->state_)
         {
-        case WSConnectState_UpgradePtl: {
-            ptl::HttpParse_ErrorCode err;
+        case NetConnectState_UpgradePtl: {
             do {
-                err = client_ptr->http_ptl_.parse(buffer);
+                err = http_ptl.parse(buffer);
                 if (err == ptl::HttpParse_OK) {
-                    int ret = client_ptr->ws_ptl_.check_upgrade_response(client_ptr->http_ptl_);
+                    int ret = ws_ptl.check_upgrade_response(http_ptl);
                     if (ret == -1) {
                         // 协议升级失败，断开连接
                         LOG_GLOBAL_WARN("Upgrade to websocket failed[PTL: HTTP, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
                         client_ptr->disconnect();
                     }
+                    ws_client_ptr->set_state(NetConnectState_Connected);
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
-                    client_ptr->disconnect();
+                    ws_client_ptr->disconnect();
                 }
             } while (err == ptl::HttpParse_OK);
         } break;
-        case WSConnectState_Connected: {
+        case NetConnectState_Connected: {
             ptl::WebsocketParse_ErrorCode err;
             do {
-                err = client_ptr->ws_ptl_.parse(buffer);
+                err = ws_ptl.parse(buffer);
                 if (err == ptl::WebsocketParse_OK) {
-                    client_ptr->handle_msg(client_ptr->ws_ptl_);
-                    client_ptr->ws_ptl_.clear();
+                    ws_client_ptr->handle_msg(ws_ptl);
+                    ws_ptl.clear();
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: Websocket, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
-                    client_ptr->disconnect();
+                    ws_client_ptr->disconnect();
                 }
             } while (err == ptl::WebsocketParse_OK);
         } break;
@@ -205,6 +210,128 @@ NetClient::client_func(void* arg)
     }
 
     return nullptr;
+}
+
+/////////////////////////////// HTTP Client ////////////////////////////////////////
+HttpNetClient::HttpNetClient(void)
+{
+
+}
+
+HttpNetClient::~HttpNetClient(void)
+{
+    disconnect();
+}
+
+int 
+HttpNetClient::connect(const std::string &url, const basic::ByteBuffer &content)
+{
+    int ret = NetClient::connect(url);
+    if (ret < 0) {
+        LOG_WARN("HTTP Client connect server failed.");
+        return -1;
+    }
+
+    if (url_parser_.type_ != ptl::ProtocolType_Http) {
+        LOG_WARN("It's not a http url: %s", url.c_str());
+        return -1;
+    }
+
+    http_ptl_.set_request(HTTP_METHOD_GET, url_parser_.res_path_);
+    http_ptl_.set_header_option(HTTP_HEADER_ContentLength, std::to_string(content.data_size()));
+    http_ptl_.set_content(content);
+
+    return send_data(http_ptl_);
+}
+
+int 
+HttpNetClient::disconnect(void)
+{
+    return NetClient::disconnect();
+}
+
+ssize_t 
+HttpNetClient::send_data(ptl::HttpPtl &http_ptl)
+{
+    basic::ByteBuffer buffer;
+    http_ptl.generate(buffer);
+
+    return NetClient::send_data(buffer);
+}
+
+int 
+HttpNetClient::handle_msg(ptl::HttpPtl &ptl)
+{
+    return 0;
+}
+
+///////////////////////// Websocket /////////////////////////////////
+WSNetClient::WSNetClient(bool heartbeat, int heartbeat_time)
+:is_heartbeat_(heartbeat)
+{
+    heartbeat_time_ = (heartbeat_time <= 0 ? 30 : heartbeat_time);
+}
+
+WSNetClient::~WSNetClient(void)
+{
+
+}
+
+int 
+WSNetClient::connect(const std::string &url, basic::ByteBuffer &content)
+{
+    int ret = NetClient::connect(url);
+    if (ret < 0) {
+        LOG_WARN("Websocket Client connect server failed.");
+        return -1;
+    }
+
+    if (url_parser_.type_ != ptl::ProtocolType_Websocket) {
+        LOG_WARN("It's not a websocket url: %s", url.c_str());
+        return -1;
+    }
+
+
+}
+
+int 
+WSNetClient::disconnect(void)
+{
+
+}
+
+ssize_t 
+WSNetClient::send_data(basic::ByteBuffer &content, int opcode, bool is_mask)
+{
+    basic::ByteBuffer buffer;
+    ws_ptl_.generate(buffer, content, opcode, is_mask);
+    return NetClient::send_data(buffer);
+}
+
+int
+WSNetClient::ws_upgrade_request(basic::ByteBuffer &content)
+{
+    ptl::HttpPtl http_ptl;
+    ws_ptl_.get_upgrade_packet(http_ptl, content, url_parser_.res_path_);
+
+    basic::ByteBuffer buffer;
+    http_ptl.generate(buffer);
+
+    set_state(NetConnectState_UpgradePtl);
+    return NetClient::send_data(buffer);
+}
+
+
+int
+WSNetClient::handle_msg(ptl::WebsocketPtl &ptl)
+{
+    return 0;
+}
+
+int
+WSNetClient::handle_msg(ptl::HttpPtl &http_ptl)
+{
+    return 0;
 }
 
 }
