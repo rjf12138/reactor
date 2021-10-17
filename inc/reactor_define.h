@@ -80,6 +80,13 @@ typedef struct EventHandle {
     void *client_arg;
     handle_func_t client_func;
     client_conn_func_t client_conn_func;
+
+    EventHandle(void)
+    : acceptor(nullptr),
+    client_arg(nullptr),
+    client_func(nullptr),
+    client_conn_func(nullptr)
+    {}
 } EventHandle_t;
 
 typedef struct ReactorConfig {

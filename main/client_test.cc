@@ -26,7 +26,6 @@ int main(int argc, char **argv)
         } else if (ch == 's') {
             client.send_data(buffer);
         }
-        os::Time::sleep(100);
     }
 
     return 0;

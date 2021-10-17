@@ -44,9 +44,14 @@ MsgHandleCenter::instance(void)
     return s_msg_handle_center;
 }
 
+MsgHandleCenter::MsgHandleCenter(void)
+{
+    thread_pool_.init();
+}
+
 MsgHandleCenter::~MsgHandleCenter(void)
 {
-
+    thread_pool_.stop_handler();
 }
 
 int 
@@ -73,7 +78,7 @@ MsgHandleCenter::add_send_task(ClientConn_t *client_ptr)
     task.work_func = send_client_data;
     task.thread_arg = client_ptr;
 
-    return thread_pool_.add_priority_task(task);
+    return thread_pool_.add_task(task);
 }
 
 void* MsgHandleCenter::send_client_data(void *arg)
@@ -154,7 +159,8 @@ SubReactor::server_register(EventHandle_t *handle_ptr)
         return -1;
     }
 
-    if (handle_ptr->acceptor->get_socket_state() == false) {
+    // 如果设置了 acceptor 需要检查它的状态是不是连接着的
+    if (handle_ptr->acceptor != nullptr && handle_ptr->acceptor->get_socket_state() == false) {
         LOG_ERROR("get_socket_state: Error acceptor socket state: %d", handle_ptr->acceptor->get_socket());
         return -1;
     }
@@ -183,7 +189,8 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
     }
 
     EventHandle_t *handle_ptr = find_iter->second;
-    if (handle_ptr->acceptor->get_socket_state() == false) {
+    // 如果设置了 acceptor 需要检查它的状态是不是连接着的
+    if (handle_ptr->acceptor != nullptr && handle_ptr->acceptor->get_socket_state() == false) {
         LOG_ERROR("get_socket_state: Error acceptor socket state: %d", handle_ptr->acceptor->get_socket());
         return -1;
     }

@@ -15,7 +15,7 @@ public:
     int add_send_task(ClientConn_t *client_ptr);
 
 private:
-    MsgHandleCenter(void) {}
+    MsgHandleCenter(void);
     MsgHandleCenter(const MsgHandleCenter&) = delete;
     MsgHandleCenter& operator=(const MsgHandleCenter&) = delete;
     

@@ -23,7 +23,6 @@ int main(int argc, char **argv)
         if (ch == 'q') {
             break;
         }
-        os::Time::sleep(100);
     }
 
 
