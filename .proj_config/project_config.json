@@ -5,7 +5,8 @@
 		"data_structure",
 		"system",
 		"protocol",
-		"util"
+		"util",
+		"algorithm"
 	],"ChooseCompiler": [
 		{
 			"CompilerName": "g++",
@@ -18,9 +19,9 @@
 	"ExportFile": [
 		"gtest"
 	],
-	"GenerateFileType": "static_lib",
+	"GenerateFileType": "exe",
 	"HeaderFileDirectoryListing": [
-		
+		"./reactor"
 	],
 	"LibraryDirectoryListing": {
 		"debug": [
@@ -32,18 +33,23 @@
 	},
 	"LibraryListing": {
 		"debug": [
-			"utild"
-		],
-		"release": [
+			"utild",
+			"basicd",
+			"protocold",
+			"systemd",
+			"pthread",
+			"utild",
+			"algorithmd"
+		],"release": [
 			
 		]
 	},
-	"MainFileName": "",
+	"MainFileName": "client_test.cc",
 	"Name": "reactor",
 	"Path": "/home/ruanjian/workspace/project_v/reactor",
 	"ProgramRunArgs": "",
 	"SourceFileDirectoryListing": [
-		"src"
-	],
-	"UUID": "c1cc904f-bc70-4fd2-93a0-3cc4e34eb629"
+		"src",
+		"reactor"
+	],"UUID": "c1cc904f-bc70-4fd2-93a0-3cc4e34eb629"
 }

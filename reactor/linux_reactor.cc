@@ -37,26 +37,11 @@ epoll_events_to_std(uint32_t events)
     return std_events;
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-
-MsgHandleCenter *MsgHandleCenter::msg_handle_center_ = nullptr;
 MsgHandleCenter& 
 MsgHandleCenter::instance(void)
 {
-    if (msg_handle_center_ == nullptr) {
-        msg_handle_center_ = new MsgHandleCenter();
-    }
-
-    return *msg_handle_center_;
-}
-
-void 
-MsgHandleCenter::destory(void)
-{
-    if (msg_handle_center_ != nullptr) {
-        msg_handle_center_->thread_pool_.stop_handler();
-        delete msg_handle_center_;
-        msg_handle_center_ = nullptr;
-    }
+    static MsgHandleCenter s_msg_handle_center;
+    return s_msg_handle_center;
 }
 
 MsgHandleCenter::~MsgHandleCenter(void)

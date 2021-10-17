@@ -8,8 +8,6 @@ namespace reactor {
 class MsgHandleCenter {
 public:
     static MsgHandleCenter& instance(void);
-    static void destory(void);
-
     virtual ~MsgHandleCenter(void);
 
     int set_config(const ReactorConfig_t &config);
@@ -18,6 +16,8 @@ public:
 
 private:
     MsgHandleCenter(void) {}
+    MsgHandleCenter(const MsgHandleCenter&) = delete;
+    MsgHandleCenter& operator=(const MsgHandleCenter&) = delete;
     
     static void* send_client_data(void *arg);
 private:
@@ -31,8 +31,6 @@ private:
 class SubReactor : public Logger {
 public:
     static SubReactor& instance(void);
-    static void destory(void);
-
     virtual ~SubReactor(void);
 
     // 注册服务
@@ -72,8 +70,6 @@ private:
 class MainReactor : public Logger {
 public:
     static MainReactor& instance(void);
-    static void destory(void);
-
     virtual ~MainReactor(void);
 
     // 添加服务端监听连接

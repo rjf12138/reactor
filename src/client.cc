@@ -24,8 +24,8 @@ NetClient::connect(const std::string &url)
     url_ = url;
     url_parser_.clear();
     int ret = url_parser_.parser(url);
-    if (ret < 0) {
-        LOG_WARN("Url Parser failed: %s: %d", url.c_str(), ret);
+    if (ret != ptl::ParserError_Ok) {
+        LOG_WARN("Url Parser failed[%s:ret=%d]", url.c_str(), ret);
         return -1;
     }
 
@@ -37,7 +37,7 @@ NetClient::connect(const std::string &url)
     }
     
     if (client_conn_ptr->client_ptr->connect() < 0) {
-        LOG_WARN("Connect Failed[%s: %d]", url_parser_.addr_, url_parser_.port_);
+        LOG_WARN("Connect Failed[%s: %d]", url_parser_.addr_.c_str(), url_parser_.port_);
         return -1;
     }
 
@@ -181,7 +181,7 @@ NetClient::client_func(void* arg)
                     ws_client_ptr->set_state(NetConnectState_Connected);
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
-                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
+                    LOG_GLOBAL_WARN("Parse data failed[PTL: HTTP, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
                     ws_client_ptr->disconnect();
                 }
@@ -196,7 +196,7 @@ NetClient::client_func(void* arg)
                     ws_ptl.clear();
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
-                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: Websocket, server: %s]", 
+                    LOG_GLOBAL_WARN("Parse data failed[PTL: Websocket, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
                     ws_client_ptr->disconnect();
                 }
@@ -291,13 +291,26 @@ WSNetClient::connect(const std::string &url, basic::ByteBuffer &content)
         return -1;
     }
 
+    return ws_upgrade_request(content);
+}
 
+int 
+WSNetClient::disconnect(basic::ByteBuffer &content)
+{
+    // 连接由服务端断开，客户端只发送断开连接的请求
+    // TODO: 加个定时器当服务端超时没有断开时，由客户端来断开连接
+    send_data(content, ptl::WEBSOCKET_OPCODE_CONNECTION_CLOSE);
+    return 0;
 }
 
 int 
 WSNetClient::disconnect(void)
 {
-
+    // 连接由服务端断开，客户端只发送断开连接的请求
+    // TODO: 加个定时器当服务端超时没有断开时，由客户端来断开连接
+    basic::ByteBuffer content;
+    send_data(content, ptl::WEBSOCKET_OPCODE_CONNECTION_CLOSE);
+    return 0;
 }
 
 ssize_t 
@@ -324,12 +337,6 @@ WSNetClient::ws_upgrade_request(basic::ByteBuffer &content)
 
 int
 WSNetClient::handle_msg(ptl::WebsocketPtl &ptl)
-{
-    return 0;
-}
-
-int
-WSNetClient::handle_msg(ptl::HttpPtl &http_ptl)
 {
     return 0;
 }

@@ -84,6 +84,12 @@ NetServer::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl)
 }
 
 int 
+NetServer::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
+{
+    return 0;
+}
+
+int 
 NetServer::handle_client_conn(client_id_t cid)
 {
     // 如果在客户端连接时需要处理一些事务，可以重载这个函数

@@ -17,14 +17,22 @@ target_compile_options(reactor_compiler_flags INTERFACE
 		$<${msvc_cxx}:$<BUILD_INTERFACE:-W3>>)
 
 # 设置生成文件输出路径
-set(LIBRARY_OUTPUT_PATH, ./output/debug/lib)
-add_library(reactor STATIC "")
+set(EXECUTABLE_OUTPUT_PATH, ./output/debug/bin)
+add_executable(reactor ./main/client_test.cc)
 
 target_include_directories(reactor PUBLIC ./inc/)
 target_include_directories(reactor PRIVATE ./extern_inc/)
+target_include_directories(reactor PRIVATE ./reactor)
 
 target_link_directories(reactor PRIVATE ./lib/debug/)
 
 target_link_libraries(reactor PRIVATE utild)
+target_link_libraries(reactor PRIVATE basicd)
+target_link_libraries(reactor PRIVATE protocold)
+target_link_libraries(reactor PRIVATE systemd)
+target_link_libraries(reactor PRIVATE pthread)
+target_link_libraries(reactor PRIVATE utild)
+target_link_libraries(reactor PRIVATE algorithmd)
 include(src/CMakeLists.txt)
+include(reactor/CMakeLists.txt)
 

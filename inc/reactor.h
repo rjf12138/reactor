@@ -22,14 +22,21 @@ public:
     NetClient(void);
     virtual ~NetClient(void);
     
+    // tcp协议连接到服务器， url: raw://ip:port
     int connect(const std::string &url);
+    // 重新连接到服务器
     int reconnect(void);
+    // 与服务器断开连接
     int disconnect(void);
 
+    // 获取客户端当前状态
     NetConnectState get_state(void);
+    // 设置客户端当前状态
     void set_state(NetConnectState state) {state_ = state;}
 
+    // 发送数据到服务器上
     ssize_t send_data(const ByteBuffer &buff);
+    // 处理服务器发送的数据
     virtual int handle_msg(basic::ByteBuffer &buffer);
 
 private:
@@ -53,11 +60,14 @@ public:
     HttpNetClient(void);
     virtual ~HttpNetClient(void);
 
+    // http 连接到服务器， url: http://ip:port/param, content： 需要发送的消息
     int connect(const std::string &url, const basic::ByteBuffer &content);
+    // 断开与服务器的连接
     int disconnect(void);
 
+    // 发送数据
     ssize_t send_data(ptl::HttpPtl &http_ptl);
-
+    // 接收服务端消息
     virtual int handle_msg(ptl::HttpPtl &http_ptl);
 
 private:
@@ -69,16 +79,19 @@ public:
     WSNetClient(bool heartbeat = false, int heartbeat_time = 30);
     virtual ~WSNetClient(void);
 
+    // websocket 连接到服务器， url格式: ws:://ip:port/param, content: 在协议升级时需要携带的数据
     int connect(const std::string &url, basic::ByteBuffer &content);
+    // 断开连接，content： 断开连接前要发送给服务器的数据
+    int disconnect(basic::ByteBuffer &content);
+    // 断开与服务端的连接
     int disconnect(void);
 
+    // 发送数据
     ssize_t send_data(basic::ByteBuffer &content, int opcode, bool is_mask = false);
-
+    // 接收服务端消息
     virtual int handle_msg(ptl::WebsocketPtl &ptl);
 
 private:
-    int handle_msg(ptl::HttpPtl &http_ptl);
-
     // 发送 websocket 协议升级请求
     int ws_upgrade_request(basic::ByteBuffer &content);
     // 处理 websocket 协议升级回复
@@ -96,19 +109,28 @@ public:
     NetServer(void);
     virtual ~NetServer(void);
 
+    // 开启服务器
     int start(const std::string &ip, int port, ptl::ProtocolType type);
+    // 停止服务器
     int stop(void);
 
+    // 关闭客户端连接, 参数 cid 可以从 handle_client_conn 中获取
     int close_client(client_id_t cid);
+    // 发送数据给客户端
     ssize_t send_data(client_id_t cid, const ByteBuffer &buff);
 
+    // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Raw 才会被调用
     virtual int handle_msg(client_id_t cid, ByteBuffer &buffer);
+    // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Http 才会被调用
     virtual int handle_msg(client_id_t cid, ptl::HttpPtl &ptl);
+    // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Websocket 才会被调用
     virtual int handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl);
+    // 客户端连接到服务器时会调用
     virtual int handle_client_conn(client_id_t cid);
 
-    // 消息收到时回调函数
+    // 进程内消息收到时回调函数
     virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
+
 private:
     static void* client_func(void* arg); // 处理客户端发过来的数据
     static void client_conn_func(client_id_t id, void* arg); // 客户端连接时的处理函数
