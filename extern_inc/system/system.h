@@ -251,11 +251,14 @@ public:
 
     // 设置最小的线程数量，当线程数量等于它时，线程即使超出它寿命依旧不杀死
     int set_threadpool_config(const ThreadPoolConfig &config);
+    // 获取线程池配置
     ThreadPoolConfig get_threadpool_config(void) const {return thread_pool_config_;}
-    // 打印线程池信息
-    std::string info(void);
+    
     // 获取线程运行状态
     ThreadPoolRunningInfo get_running_info(void);
+    // 实时打印当前线程池信息
+    void show_threadpool_info(void);
+
     // 获取线程池状态
     ThreadState get_state(void) {return state_;}
 
@@ -275,11 +278,15 @@ private:
     // 任务的分配
     int manage_work_threads(bool is_init);
 
+    // 打印线程池信息
+    static void *print_threadpool_info(void *arg);
+
 private:
     int thread_move_to_idle_map(int64_t thread_id);
     int thread_move_to_running_map(int64_t thread_id);
     
 private:
+    bool print_info_;
     bool exit_;
     ThreadState state_;
     ThreadPoolConfig thread_pool_config_;// 多余的空闲线程会被杀死，直到数量达到最小允许的线程数为止。单位：秒

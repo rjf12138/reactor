@@ -46,7 +46,8 @@ MsgHandleCenter::instance(void)
 
 MsgHandleCenter::MsgHandleCenter(void)
 {
-    thread_pool_.init();
+    // thread_pool_.init();
+    thread_pool_.show_threadpool_info();
 }
 
 MsgHandleCenter::~MsgHandleCenter(void)
