@@ -39,21 +39,21 @@ typedef uint64_t client_id_t;
 typedef uint64_t server_id_t;
 typedef struct ClientConn {
     client_id_t client_id;
-    os::SocketTCP* client_ptr;
+    os::SocketTCP* socket_ptr;
 
     os::Mutex buff_mutex;
     ByteBuffer send_buffer;
     
     ClientConn(void)
-    :client_ptr(nullptr) {
+    :socket_ptr(nullptr) {
         client_id = reinterpret_cast<uint64_t>(this);
-        client_ptr = new os::SocketTCP();
+        socket_ptr = new os::SocketTCP();
     }
 
     ~ClientConn(void) {
-        if (client_ptr != nullptr) {
-            client_ptr->close();
-            delete client_ptr;
+        if (socket_ptr != nullptr) {
+            socket_ptr->close();
+            delete socket_ptr;
         }
     }
 } ClientConn_t;

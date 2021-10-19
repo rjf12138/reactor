@@ -21,6 +21,7 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
         return -1;
     }
     server_.listen();
+    server_.setnonblocking();
 
     type_ = type;
 
@@ -124,7 +125,7 @@ NetServer::client_func(void* arg)
         }
 
         client_id_t id = server_ptr->handle_.client_conn[ready_client_sock]->client_id;
-        server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->recv(buffer);
+        server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->recv(buffer);
         if (server_ptr->type_ == ptl::ProtocolType_Raw) {
             server_ptr->handle_msg(id, buffer);
         } else if (server_ptr->type_ == ptl::ProtocolType_Http) {
@@ -138,7 +139,7 @@ NetServer::client_func(void* arg)
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, client: %s]", 
-                            server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->get_ip_info().c_str());
+                            server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->get_ip_info().c_str());
                     server_ptr->close_client(id);
                 }
             } while (err == ptl::HttpParse_OK);
@@ -153,12 +154,12 @@ NetServer::client_func(void* arg)
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: WebSocket, client: %s]", 
-                            server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->get_ip_info().c_str());
+                            server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->get_ip_info().c_str());
                     server_ptr->close_client(id);
                 }
             } while (err == ptl::WebsocketParse_OK);
         } else {
-            LOG_GLOBAL_WARN("[PTL: Unknown, client: %s]", server_ptr->handle_.client_conn[ready_client_sock]->client_ptr->get_ip_info().c_str());
+            LOG_GLOBAL_WARN("[PTL: Unknown, client: %s]", server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->get_ip_info().c_str());
             server_ptr->close_client(id);
         }
     }

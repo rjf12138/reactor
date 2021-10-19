@@ -31,12 +31,12 @@ NetClient::connect(const std::string &url)
 
     // 在断开连接时会主动释放内存
     ClientConn_t  *client_conn_ptr = new ClientConn_t;
-    client_conn_ptr->client_ptr->create_socket(url_parser_.addr_, url_parser_.port_);
-    if (client_conn_ptr->client_ptr->get_socket_state() == false) {
+    client_conn_ptr->socket_ptr->create_socket(url_parser_.addr_, url_parser_.port_);
+    if (client_conn_ptr->socket_ptr->get_socket_state() == false) {
         return -1;
     }
     
-    if (client_conn_ptr->client_ptr->connect() < 0) {
+    if (client_conn_ptr->socket_ptr->connect() < 0) {
         LOG_WARN("Connect Failed[%s: %d]", url_parser_.addr_.c_str(), url_parser_.port_);
         return -1;
     }
@@ -57,6 +57,7 @@ NetClient::connect(const std::string &url)
         return -1;
     }
 
+    client_conn_ptr->socket_ptr->setnonblocking();
     ret = SubReactor::instance().add_client_conn(sid_, client_conn_ptr);
     if (ret < 0) {
         LOG_WARN("Add client connection Failed[%s: %d]", url_parser_.addr_, url_parser_.port_);
@@ -132,7 +133,7 @@ NetClient::client_func(void* arg)
         return nullptr;
     }
 
-    os::SocketTCP *socket_ptr = client_ptr->client_conn_ptr_->client_ptr;
+    os::SocketTCP *socket_ptr = client_ptr->client_conn_ptr_->socket_ptr;
     if (socket_ptr->get_socket_state() == false) {
         LOG_GLOBAL_WARN("Client socket[%s] closed.", socket_ptr->get_ip_info().c_str());
         return nullptr;

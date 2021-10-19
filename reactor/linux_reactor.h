@@ -91,6 +91,7 @@ private:
     MainReactor(const MainReactor &) = delete;
     MainReactor& operator=(const MainReactor&) = delete;
 
+    inline EventHandle_t* get_event_handle(int listen_socket_fd);
 private:
     bool exit_;
     int epfd_;
@@ -100,6 +101,7 @@ private:
     struct epoll_event *events_;
 
     os::Mutex server_ctl_mutex_;
+    std::map<int, server_id_t> server_listen_to_;
     std::map<server_id_t, EventHandle_t*> acceptor_;
 };
 

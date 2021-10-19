@@ -18,7 +18,7 @@ int main(int argc, char **argv)
     TestClient client;
     client.connect("raw://127.0.0.1:12138");
 
-    basic::ByteBuffer buffer(std::string("Hello, world!"));
+    basic::ByteBuffer buffer(std::string("Hello, world!\n"));
     while (true) {
         char ch = getchar();
         if (ch == 'q') {

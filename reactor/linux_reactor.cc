@@ -46,8 +46,7 @@ MsgHandleCenter::instance(void)
 
 MsgHandleCenter::MsgHandleCenter(void)
 {
-    // thread_pool_.init();
-    thread_pool_.show_threadpool_info();
+    // thread_pool_.show_threadpool_info();
 }
 
 MsgHandleCenter::~MsgHandleCenter(void)
@@ -90,7 +89,7 @@ void* MsgHandleCenter::send_client_data(void *arg)
 
     ClientConn_t *client_ptr = reinterpret_cast<ClientConn_t*>(arg);
     client_ptr->buff_mutex.lock();
-    client_ptr->client_ptr->send(client_ptr->send_buffer);
+    client_ptr->socket_ptr->send(client_ptr->send_buffer);
     client_ptr->buff_mutex.unlock();
 
     return nullptr;
@@ -184,8 +183,8 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
         return -1;
     }
 
-    if (client_conn_ptr->client_ptr->get_socket_state() == false) {
-        LOG_ERROR("get_socket_state: Error client socket state: %d", client_conn_ptr->client_ptr->get_socket());
+    if (client_conn_ptr->socket_ptr->get_socket_state() == false) {
+        LOG_ERROR("get_socket_state: Error client socket state: %d", client_conn_ptr->socket_ptr->get_socket());
         return -1;
     }
 
@@ -198,9 +197,8 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
 
     // 添加客户端连接监听
     struct epoll_event ep_events = std_to_epoll_events(handle_ptr->events);
-    ep_events.data.fd = client_conn_ptr->client_ptr->get_socket();
-
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, client_conn_ptr->client_ptr->get_socket(), &ep_events);
+    ep_events.data.fd = client_conn_ptr->socket_ptr->get_socket();
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, client_conn_ptr->socket_ptr->get_socket(), &ep_events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
@@ -208,7 +206,7 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
 
     handle_ptr->client_conn_mutex.lock();
     handle_ptr->client_conn[client_conn_ptr->client_id] = client_conn_ptr;
-    client_conn_to_[client_conn_ptr->client_ptr->get_socket()] = handle_ptr->server_id;
+    client_conn_to_[client_conn_ptr->socket_ptr->get_socket()] = handle_ptr->server_id;
     handle_ptr->client_conn_mutex.unlock();
 
     return 0;
@@ -232,15 +230,15 @@ SubReactor::remove_client_conn(server_id_t sid, client_id_t cid)
 
     // 移除客户端连接监听
     struct epoll_event ep_events = std_to_epoll_events(handle_ptr->events);
-    ep_events.data.fd = client_iter->second->client_ptr->get_socket();
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_DEL, client_iter->second->client_ptr->get_socket(), &ep_events);
+    ep_events.data.fd = client_iter->second->socket_ptr->get_socket();
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_DEL, client_iter->second->socket_ptr->get_socket(), &ep_events);
     if (ret == -1) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
     ClientConn_t *del_conn_ptr = client_iter->second;
-    auto client_conn_to_iter = client_conn_to_.find(client_iter->second->client_ptr->get_socket());
+    auto client_conn_to_iter = client_conn_to_.find(client_iter->second->socket_ptr->get_socket());
     handle_ptr->client_conn_mutex.lock();
     client_conn_to_.erase(client_conn_to_iter);
     handle_ptr->client_conn.erase(client_iter);
@@ -279,13 +277,13 @@ SubReactor::event_wait(void *arg)
 
             ClientConn_t *conn_ptr = handle_ptr->client_conn[ready_socket_fd];
             if (epoll_ptr->events_[i].events | EPOLLRDHUP) {
-                LOG_GLOBAL_INFO("Client[%s] closed, remove client", conn_ptr->client_ptr->get_ip_info().c_str());
+                LOG_GLOBAL_INFO("Client[%s] closed, remove client", conn_ptr->socket_ptr->get_ip_info().c_str());
                 epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
             } else if (epoll_ptr->events_[i].events | EPOLLERR) {
-                LOG_GLOBAL_WARN("Client[%s] Error, remove client", conn_ptr->client_ptr->get_ip_info().c_str());
+                LOG_GLOBAL_WARN("Client[%s] Error, remove client", conn_ptr->socket_ptr->get_ip_info().c_str());
                 epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
             } else if (epoll_ptr->events_[i].events | EPOLLHUP) {
-                LOG_GLOBAL_INFO("Client[%s] closed read", conn_ptr->client_ptr->get_ip_info().c_str());
+                LOG_GLOBAL_INFO("Client[%s] closed read", conn_ptr->socket_ptr->get_ip_info().c_str());
             } else {
                 handle_ptr->ready_sock_mutex.lock();
                 handle_ptr->ready_sock.push(ready_socket_fd);
@@ -344,8 +342,8 @@ MainReactor::MainReactor(int events_max_size, int timeout)
     }
 
     os::Task task;
-    task.work_func = SubReactor::event_wait;
-    task.exit_task = SubReactor::event_exit;
+    task.work_func = MainReactor::event_wait;
+    task.exit_task = MainReactor::event_exit;
     task.thread_arg = this;
     task.exit_arg = this;
 
@@ -360,10 +358,26 @@ MainReactor::~MainReactor(void)
     }
 }
 
+EventHandle_t* 
+MainReactor::get_event_handle(int listen_socket_fd)
+{
+    auto server_iter = server_listen_to_.find(listen_socket_fd);
+    if (server_iter == server_listen_to_.end()) {
+        return nullptr;
+    }
+
+    auto handle_iter = acceptor_.find(server_iter->second);
+    if (handle_iter == acceptor_.end()) {
+        return nullptr;
+    }
+
+    return handle_iter->second;
+}
+
 int 
 MainReactor::add_server_accept(EventHandle_t *handle_ptr)
 {
-    if (handle_ptr == nullptr) {
+    if (handle_ptr == nullptr || handle_ptr->acceptor == nullptr) {
         LOG_ERROR("handle_ptr is nullptr");
         return -1;
     }
@@ -377,12 +391,13 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
     ep_events.events = EPOLLIN;
     ep_events.data.fd = handle_ptr->acceptor->get_socket();
     int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, handle_ptr->acceptor->get_socket(), &ep_events);
-    if (ret == -1) {
+    if (ret < 0) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
     }
 
     server_ctl_mutex_.lock();
+    server_listen_to_[handle_ptr->acceptor->get_socket()] = handle_ptr->server_id;
     acceptor_[handle_ptr->server_id] = handle_ptr;
     SubReactor::instance().server_register(handle_ptr);
     server_ctl_mutex_.unlock();
@@ -433,7 +448,7 @@ MainReactor::event_wait(void *arg)
     MainReactor *epoll_ptr = (MainReactor*)arg;
     while (epoll_ptr->exit_ == false) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
-        if (ret == -1) {
+        if (ret < 0) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
             return nullptr;
         } else if (ret == 0) {
@@ -441,19 +456,26 @@ MainReactor::event_wait(void *arg)
         }
 
         for (int i = 0; i < ret; ++i) {
-            auto find_iter = epoll_ptr->acceptor_.find(epoll_ptr->events_[i].data.fd);
-            if (find_iter == epoll_ptr->acceptor_.end()) {
+            int ready_socket_fd = epoll_ptr->events_[i].data.fd;
+            EventHandle_t *handle_ptr = epoll_ptr->get_event_handle(ready_socket_fd);
+            if (handle_ptr == nullptr) {
+                LOG_GLOBAL_WARN("Cant find EventHandle of socket[%d]", ready_socket_fd);
                 continue;
             }
 
-            EventHandle_t *handle_ptr = find_iter->second;
             int client_sock_fd = 0;
             socklen_t addrlen = 0;
             struct sockaddr addr;
             if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0 && handle_ptr->exit == false) {
                 ClientConn_t *client_conn_ptr = new ClientConn_t;
-                client_conn_ptr->client_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
-                SubReactor::instance().add_client_conn(handle_ptr->acceptor->get_socket(), client_conn_ptr);
+                client_conn_ptr->socket_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
+                client_conn_ptr->socket_ptr->setnonblocking();
+                int ret = SubReactor::instance().add_client_conn(handle_ptr->server_id, client_conn_ptr);
+                if (ret < 0) {
+                    client_conn_ptr->socket_ptr->close();
+                    delete client_conn_ptr;
+                    continue;
+                }
 
                 if (handle_ptr->client_conn_func != nullptr) {
                     handle_ptr->client_conn_func(client_conn_ptr->client_id, handle_ptr->client_arg);
