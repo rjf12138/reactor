@@ -260,7 +260,7 @@ SubReactor::event_wait(void *arg)
     SubReactor *epoll_ptr = (SubReactor*)arg;
     while (epoll_ptr->exit_ == false) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
-        if (ret == -1) {
+        if (ret == -1 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
             return nullptr;
         } else if (ret == 0) {
@@ -276,15 +276,15 @@ SubReactor::event_wait(void *arg)
             }
 
             ClientConn_t *conn_ptr = handle_ptr->client_conn[ready_socket_fd];
-            if (epoll_ptr->events_[i].events | EPOLLRDHUP) {
+            if (epoll_ptr->events_[i].events & EPOLLRDHUP) {
                 LOG_GLOBAL_INFO("Client[%s] closed, remove client", conn_ptr->socket_ptr->get_ip_info().c_str());
                 epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
-            } else if (epoll_ptr->events_[i].events | EPOLLERR) {
+            } else if (epoll_ptr->events_[i].events & EPOLLERR) {
                 LOG_GLOBAL_WARN("Client[%s] Error, remove client", conn_ptr->socket_ptr->get_ip_info().c_str());
                 epoll_ptr->remove_client_conn(handle_ptr->server_id, conn_ptr->client_id);
-            } else if (epoll_ptr->events_[i].events | EPOLLHUP) {
+            } else if (epoll_ptr->events_[i].events & EPOLLHUP) {
                 LOG_GLOBAL_INFO("Client[%s] closed read", conn_ptr->socket_ptr->get_ip_info().c_str());
-            } else {
+            } else if (epoll_ptr->events_[i].events & EPOLLIN){
                 handle_ptr->ready_sock_mutex.lock();
                 handle_ptr->ready_sock.push(ready_socket_fd);
                 if (handle_ptr->state == EventHandleState_Idle) {
@@ -448,7 +448,7 @@ MainReactor::event_wait(void *arg)
     MainReactor *epoll_ptr = (MainReactor*)arg;
     while (epoll_ptr->exit_ == false) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
-        if (ret < 0) {
+        if (ret < 0 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
             return nullptr;
         } else if (ret == 0) {
@@ -468,6 +468,7 @@ MainReactor::event_wait(void *arg)
             struct sockaddr addr;
             if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0 && handle_ptr->exit == false) {
                 ClientConn_t *client_conn_ptr = new ClientConn_t;
+                client_conn_ptr->client_id = client_sock_fd;
                 client_conn_ptr->socket_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
                 client_conn_ptr->socket_ptr->setnonblocking();
                 int ret = SubReactor::instance().add_client_conn(handle_ptr->server_id, client_conn_ptr);

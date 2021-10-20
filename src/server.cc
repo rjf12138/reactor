@@ -53,7 +53,7 @@ NetServer::close_client(client_id_t cid)
 ssize_t 
 NetServer::send_data(client_id_t id, const ByteBuffer &buff)
 {
-    ClientConn_t* client_conn_ptr = reinterpret_cast<ClientConn_t*>(id);
+    ClientConn_t* client_conn_ptr = handle_.client_conn[id];
     client_conn_ptr->buff_mutex.lock();
     client_conn_ptr->send_buffer += buff;
     client_conn_ptr->buff_mutex.unlock();

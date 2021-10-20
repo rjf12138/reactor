@@ -35,7 +35,7 @@ enum EventHandleState {  // 事件当前状态
     EventHandleState_Handling,  // 正在处理就绪事件
 };
 
-typedef uint64_t client_id_t;
+typedef uint32_t client_id_t;
 typedef uint64_t server_id_t;
 typedef struct ClientConn {
     client_id_t client_id;
@@ -46,7 +46,6 @@ typedef struct ClientConn {
     
     ClientConn(void)
     :socket_ptr(nullptr) {
-        client_id = reinterpret_cast<uint64_t>(this);
         socket_ptr = new os::SocketTCP();
     }
 

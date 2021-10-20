@@ -40,6 +40,7 @@ NetClient::connect(const std::string &url)
         LOG_WARN("Connect Failed[%s: %d]", url_parser_.addr_.c_str(), url_parser_.port_);
         return -1;
     }
+    client_conn_ptr->client_id = client_conn_ptr->socket_ptr->get_socket_state();
 
     handle_.exit = false;
     handle_.server_id = sid_;
@@ -104,7 +105,7 @@ NetClient::send_data(const ByteBuffer &buff)
         return -1;
     }
 
-    ClientConn_t* client_conn_ptr = reinterpret_cast<ClientConn_t*>(cid_);
+    ClientConn_t* client_conn_ptr = handle_.client_conn[cid_];
     client_conn_ptr->buff_mutex.lock();
     client_conn_ptr->send_buffer += buff;
     client_conn_ptr->buff_mutex.unlock();
