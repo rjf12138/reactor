@@ -8,9 +8,25 @@ public:
     ~TestServer(void) {}
 
     virtual int handle_msg(client_id_t cid, basic::ByteBuffer &buffer) {
-        LOG_TRACE("Client request: %s", buffer.str().c_str());
-        return send_data(cid, buffer);
+        if (is_first == false) {
+            is_first = true;
+            start_time = os::Time::now();
+            last_time = start_time;
+        }
+        recv_size += buffer.data_size();
+        if (os::Time::now() - last_time > 5000) {
+            LOG_TRACE("recv_speed: %lf B/ms", (double)recv_size / (os::Time::now() - start_time));
+            last_time = os::Time::now();
+        }
+        // LOG_TRACE("Client request: %s", buffer.str().c_str());
+        // return send_data(cid, buffer);
+        return 0;
     }
+private:
+    bool is_first = false;
+    uint64_t recv_size = 0;
+    os::mtime_t start_time;
+    os::mtime_t last_time;
 };
 
 int main(int argc, char **argv)

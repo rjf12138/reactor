@@ -22,13 +22,14 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
     }
     server_.listen();
     server_.setnonblocking();
+    server_.set_reuse_addr();
 
     type_ = type;
 
     handle_.exit = false;
     handle_.server_id = id_;
     handle_.acceptor = &server_;
-    handle_.events = EventType_In | EventType_RDHup | EventType_Err;
+    handle_.events = EventType_In | EventType_RDHup | EventType_Err | EventType_ET;
     handle_.method = EventMethod_Epoll;
     
     handle_.client_arg = this;
@@ -105,13 +106,11 @@ NetServer::client_func(void* arg)
     }
 
     NetServer *server_ptr = (NetServer*)arg;
-    ByteBuffer buffer;
-
     int ready_client_sock = 0;
     while (true) {
         server_ptr->handle_.ready_sock_mutex.lock();
         int ret = server_ptr->handle_.ready_sock.pop(ready_client_sock);
-        if (ret < 0) {
+        if (ret <= 0) {
             server_ptr->handle_.state = EventHandleState_Idle;
             server_ptr->handle_.ready_sock_mutex.unlock();
             break;
@@ -124,10 +123,16 @@ NetServer::client_func(void* arg)
             continue;
         }
 
+        ByteBuffer &buffer = server_ptr->handle_.client_conn[ready_client_sock]->recv_buffer;
         client_id_t id = server_ptr->handle_.client_conn[ready_client_sock]->client_id;
-        server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->recv(buffer);
+        int size = server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->recv(buffer);
+        if (size <= 0) {
+            continue;
+        }
+
         if (server_ptr->type_ == ptl::ProtocolType_Raw) {
             server_ptr->handle_msg(id, buffer);
+            buffer.clear();
         } else if (server_ptr->type_ == ptl::ProtocolType_Http) {
             ptl::HttpPtl http_ptl;
             ptl::HttpParse_ErrorCode err;

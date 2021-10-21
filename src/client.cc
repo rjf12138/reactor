@@ -45,7 +45,7 @@ NetClient::connect(const std::string &url)
     handle_.exit = false;
     handle_.server_id = sid_;
     handle_.acceptor = nullptr;
-    handle_.events = EventType_In | EventType_RDHup | EventType_Err;
+    handle_.events = EventType_In | EventType_RDHup | EventType_Err | EventType_ET;
     handle_.method = EventMethod_Epoll;
     
     handle_.client_arg = this;
@@ -128,22 +128,28 @@ NetClient::client_func(void* arg)
         return nullptr;
     }
 
+    int size = 0;
     NetClient *client_ptr = (NetClient*)arg;
+    ByteBuffer &buffer = client_ptr->client_conn_ptr_->recv_buffer;
+    os::SocketTCP *socket_ptr = client_ptr->client_conn_ptr_->socket_ptr;
     if (client_ptr->client_conn_ptr_ == nullptr) {
         LOG_GLOBAL_WARN("client_conn_ptr_ is nullptr[url: %s]", client_ptr->url_.c_str());
-        return nullptr;
+        goto end;
     }
 
-    os::SocketTCP *socket_ptr = client_ptr->client_conn_ptr_->socket_ptr;
     if (socket_ptr->get_socket_state() == false) {
         LOG_GLOBAL_WARN("Client socket[%s] closed.", socket_ptr->get_ip_info().c_str());
-        return nullptr;
+        goto end;
     }
 
-    ByteBuffer buffer;
-    socket_ptr->recv(buffer);
+
+    size = socket_ptr->recv(buffer);
+    if (size <= 0) {
+        goto end;
+    }
     if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Raw) {
         client_ptr->handle_msg(buffer);
+        buffer.clear();
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Http) {
         ptl::HttpPtl http_ptl;
         ptl::HttpParse_ErrorCode err;
@@ -210,6 +216,8 @@ NetClient::client_func(void* arg)
     } else {
         LOG_GLOBAL_WARN("Unknown ptl: %d", client_ptr->url_parser_.type_);
     }
+end:
+    client_ptr->handle_.state = EventHandleState_Idle;
 
     return nullptr;
 }

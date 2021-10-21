@@ -24,7 +24,11 @@ int main(int argc, char **argv)
         if (ch == 'q') {
             break;
         } else if (ch == 's') {
-            client.send_data(buffer);
+            for (int i = 0; i < 10000; ++i) {
+                client.send_data(buffer);
+                //os::Time::sleep(5);
+            }
+            LOG_GLOBAL_INFO("send over!");
         }
     }
 

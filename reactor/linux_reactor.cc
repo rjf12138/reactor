@@ -19,6 +19,7 @@ std_to_epoll_events(uint32_t type)
     CONVERT_TYPE(type, event.events, EventType_RDHup, EPOLLRDHUP);
     CONVERT_TYPE(type, event.events, EventType_Err, EPOLLERR);
     CONVERT_TYPE(type, event.events, EventType_Hup, EPOLLHUP);
+    CONVERT_TYPE(type, event.events, EventType_ET, EPOLLET);
 
     return event;
 }

@@ -21,6 +21,7 @@ enum EventType {
     EventType_RDHup = 0x008,    // 连接被对方关闭，或者对方关闭了写操作
     EventType_Err   = 0x010,    // 错误
     EventType_Hup   = 0x020,    // 挂起。比如管道写端关闭后，读端描述符上将收到POLLHUP事件
+    EventType_ET    = 0x040,    // 只触发一次，除非发生新的事件不然就不会在触发了
 };
 
 enum EventOperation {
@@ -43,6 +44,7 @@ typedef struct ClientConn {
 
     os::Mutex buff_mutex;
     ByteBuffer send_buffer;
+    ByteBuffer recv_buffer;
     
     ClientConn(void)
     :socket_ptr(nullptr) {
@@ -84,7 +86,8 @@ typedef struct EventHandle {
     : acceptor(nullptr),
     client_arg(nullptr),
     client_func(nullptr),
-    client_conn_func(nullptr)
+    client_conn_func(nullptr),
+    state(EventHandleState_Idle)
     {}
 } EventHandle_t;
 
