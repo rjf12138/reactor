@@ -94,6 +94,8 @@ typedef struct EventHandle {
 typedef struct ReactorConfig {
     uint32_t min_thread_num;
     uint32_t max_thread_num;
+    uint32_t send_thread_num;
+    uint32_t max_wait_task;
 } ReactorConfig_t;
 }
 

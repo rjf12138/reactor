@@ -12,19 +12,46 @@ public:
 
     int set_config(const ReactorConfig_t &config);
     int add_task(os::Task &task);
-    int add_send_task(ClientConn_t *client_ptr);
 
 private:
     MsgHandleCenter(void);
     MsgHandleCenter(const MsgHandleCenter&) = delete;
     MsgHandleCenter& operator=(const MsgHandleCenter&) = delete;
-    
-    static void* send_client_data(void *arg);
-private:
-    static MsgHandleCenter *msg_handle_center_;
 
+private:
     ReactorConfig_t config_;
     os::ThreadPool thread_pool_;
+};
+
+///////////////////////////// 发送数据处理 ////////////////////////////////////////////
+// TODO: 如何为 senddatacenter 分配线程， 以及添加写注册
+class SendDataCenter {
+public:
+    static SendDataCenter& instance(void);
+    virtual ~SendDataCenter(void);
+
+    int send_data(client_id_t cid);
+    int register_connection(ClientConn_t *client_ptr);
+    int remove_connection(client_id_t cid);
+
+private:
+    SendDataCenter(void);
+    SendDataCenter(const MsgHandleCenter&) = delete;
+    SendDataCenter& operator=(const MsgHandleCenter&) = delete;
+
+    static void* send_loop(void* arg);
+    static void* exit_loop(void* arg);
+
+private:
+    static SendDataCenter *send_center_;
+
+    bool send_exit_;
+
+    os::Mutex send_mtx_;
+    ds::Queue<client_id_t> send_queue_;
+
+    os::Mutex conn_mtx_;
+    std::map<client_id_t, ClientConn_t*> sender_conns_;
 };
 
 //////////////////////////// 处理客户端的数据 ////////////////////////////////////////////

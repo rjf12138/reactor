@@ -59,7 +59,7 @@ NetServer::send_data(client_id_t id, const ByteBuffer &buff)
     client_conn_ptr->send_buffer += buff;
     client_conn_ptr->buff_mutex.unlock();
 
-    MsgHandleCenter::instance().add_send_task(client_conn_ptr);
+    SendDataCenter::instance().send_data(client_conn_ptr->client_id);
 
     return buff.data_size();
 }

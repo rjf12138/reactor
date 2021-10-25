@@ -110,7 +110,7 @@ NetClient::send_data(const ByteBuffer &buff)
     client_conn_ptr->send_buffer += buff;
     client_conn_ptr->buff_mutex.unlock();
 
-    MsgHandleCenter::instance().add_send_task(client_conn_ptr);
+    SendDataCenter::instance().send_data(client_conn_ptr->client_id);
 
     return buff.data_size();
 }
@@ -141,7 +141,6 @@ NetClient::client_func(void* arg)
         LOG_GLOBAL_WARN("Client socket[%s] closed.", socket_ptr->get_ip_info().c_str());
         goto end;
     }
-
 
     size = socket_ptr->recv(buffer);
     if (size <= 0) {

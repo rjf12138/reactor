@@ -1,24 +1,2 @@
 1. 在速度测试时，客户端会崩溃
-Thread 11:
-==18388== Invalid read of size 8
-==18388==    at 0x11A977: reactor::SubReactor::event_wait(void*) (linux_reactor.cc:281)
-==18388==    by 0x166646: os::WorkThread::run_handler() (thread.cc:109)
-==18388==    by 0x166048: os::Thread::create_func(void*) (thread.cc:25)
-==18388==    by 0x486B608: start_thread (pthread_create.c:477)
-==18388==    by 0x4BA4292: clone (clone.S:95)
-==18388==  Address 0x8 is not stack'd, malloc'd or (recently) free'd
-==18388== 
-==18388== 
-==18388== Process terminating with default action of signal 11 (SIGSEGV): dumping core
-==18388==  Access not within mapped region at address 0x8
-==18388==    at 0x11A977: reactor::SubReactor::event_wait(void*) (linux_reactor.cc:281)
-==18388==    by 0x166646: os::WorkThread::run_handler() (thread.cc:109)
-==18388==    by 0x166048: os::Thread::create_func(void*) (thread.cc:25)
-==18388==    by 0x486B608: start_thread (pthread_create.c:477)
-==18388==    by 0x4BA4292: clone (clone.S:95)
-==18388==  If you believe this happened as a result of a stack
-==18388==  overflow in your program's main thread (unlikely but
-==18388==  possible), you can try to increase the size of the
-==18388==  main thread stack using the --main-stacksize= flag.
-
-2. 对于单个客户端而言，发送消息过于频繁会造成线程被占用
+2. 设计一个全局环境变量

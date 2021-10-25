@@ -61,6 +61,7 @@ MsgHandleCenter::set_config(const ReactorConfig_t &config)
     os::ThreadPoolConfig threadpool_config = thread_pool_.get_threadpool_config();
     threadpool_config.max_thread_num = config.max_thread_num;
     threadpool_config.min_thread_num = config.min_thread_num;
+    threadpool_config.max_waiting_task = config.max_wait_task;
     thread_pool_.set_threadpool_config(threadpool_config);
 
     return 0;
@@ -72,26 +73,101 @@ MsgHandleCenter::add_task(os::Task &task)
     return thread_pool_.add_task(task);
 }
 
-int 
-MsgHandleCenter::add_send_task(ClientConn_t *client_ptr)
+//////////////////////////////////////////////////////////////////////////////////////////
+SendDataCenter& 
+SendDataCenter::instance(void)
 {
-    os::Task task;
-    task.work_func = send_client_data;
-    task.thread_arg = client_ptr;
-
-    return thread_pool_.add_task(task);
+    static SendDataCenter send_data_center_;
+    return send_data_center_;
 }
 
-void* MsgHandleCenter::send_client_data(void *arg)
+SendDataCenter::SendDataCenter(void)
+{
+    
+}
+
+SendDataCenter::~SendDataCenter(void)
+{
+}
+
+int 
+SendDataCenter::send_data(client_id_t cid)
+{
+    send_mtx_.lock();
+    send_queue_.push(cid);
+    send_mtx_.unlock();
+
+    return 0;
+}
+
+int 
+SendDataCenter::register_connection(ClientConn_t *client_ptr)
+{
+    conn_mtx_.lock();
+    sender_conns_[client_ptr->client_id] = client_ptr;
+    conn_mtx_.unlock();
+    return 1;
+}
+
+int 
+SendDataCenter::remove_connection(client_id_t cid)
+{
+    auto iter = sender_conns_.find(cid);
+    if (iter == sender_conns_.end()) {
+        return 0;
+    }
+
+    conn_mtx_.lock();
+    sender_conns_.erase(iter);
+    conn_mtx_.unlock();
+
+    return 1;
+}
+
+void* 
+SendDataCenter::send_loop(void* arg)
 {
     if (arg == nullptr) {
         return nullptr;
     }
 
-    ClientConn_t *client_ptr = reinterpret_cast<ClientConn_t*>(arg);
-    client_ptr->buff_mutex.lock();
-    client_ptr->socket_ptr->send(client_ptr->send_buffer);
-    client_ptr->buff_mutex.unlock();
+    SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
+    while (sender_ptr->send_exit_ == false) {
+        if (sender_ptr->send_queue_.size() <= 0) {
+            os::Time::sleep(5);
+        }
+
+        client_id_t cid;
+        while (sender_ptr->send_queue_.size() > 0) {
+            sender_ptr->send_mtx_.lock();
+            sender_ptr->send_queue_.pop(cid);
+            sender_ptr->send_mtx_.unlock();
+
+            auto iter = sender_ptr->sender_conns_.find(cid);
+            if (iter == sender_ptr->sender_conns_.end()) {
+                LOG_GLOBAL_WARN("Can't find sender object[%d]", cid);
+                continue;
+            }
+
+            if (iter->second->send_buffer.data_size() == 0) {
+                continue;
+            }
+            iter->second->socket_ptr->send(iter->second->send_buffer);
+        }
+    }
+
+    return nullptr;
+}
+
+void* 
+SendDataCenter::exit_loop(void* arg)
+{
+    if (arg == nullptr) {
+        return nullptr;
+    }
+
+    SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
+    sender_ptr->send_exit_ = true;
 
     return nullptr;
 }
