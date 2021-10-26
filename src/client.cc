@@ -67,7 +67,6 @@ NetClient::connect(const std::string &url)
     }
     cid_ = client_conn_ptr->client_id;
     client_conn_ptr_ = client_conn_ptr;
-
     state_ = NetConnectState_Connected;
 
     return ret;

@@ -82,8 +82,15 @@ SendDataCenter::instance(void)
 }
 
 SendDataCenter::SendDataCenter(void)
+:send_exit_(false)
 {
-    
+    os::Task task;
+    task.work_func = send_loop;
+    task.thread_arg = this;
+    task.exit_task = exit_loop;
+    task.exit_arg = this;
+
+    MsgHandleCenter::instance().add_task(task);
 }
 
 SendDataCenter::~SendDataCenter(void)
@@ -286,6 +293,8 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
     client_conn_to_[client_conn_ptr->socket_ptr->get_socket()] = handle_ptr->server_id;
     handle_ptr->client_conn_mutex.unlock();
 
+    SendDataCenter::instance().register_connection(client_conn_ptr);
+
     return 0;
 }
 
@@ -464,10 +473,11 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
         return -1;
     }
 
-    struct epoll_event ep_events;
-    ep_events.events = EPOLLIN;
-    ep_events.data.fd = handle_ptr->acceptor->get_socket();
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, handle_ptr->acceptor->get_socket(), &ep_events);
+    struct epoll_event *ep_events = new epoll_event; // TODO: 释放这里的内存,https://blog.csdn.net/abcjennifer/article/details/49227333
+    ep_events->events = EPOLLIN | EPOLLERR;
+    ep_events->data.fd = handle_ptr->acceptor->get_socket();
+    LOG_INFO("Add acceptor: %d", ep_events->data.fd);
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, ep_events->data.fd, ep_events);
     if (ret < 0) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;

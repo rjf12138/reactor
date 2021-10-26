@@ -44,7 +44,7 @@ private:
 
 private:
     static SendDataCenter *send_center_;
-
+    
     bool send_exit_;
 
     os::Mutex send_mtx_;
