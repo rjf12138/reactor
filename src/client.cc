@@ -4,6 +4,7 @@
 namespace reactor {
 
 NetClient::NetClient(void)
+:state_(NetConnectState_Dissconnected)
 {
     sid_ = reinterpret_cast<server_id_t>(this);
 }
@@ -17,7 +18,7 @@ int
 NetClient::connect(const std::string &url)
 {
     if (state_ != NetConnectState_Dissconnected) {
-        LOG_WARN("Client already connect other server[%s: %d]", url_parser_.addr_, url_parser_.port_);
+        LOG_WARN("Client already connect other server[%s: %d]", url_parser_.addr_.c_str(), url_parser_.port_);
         return -1;
     }
 

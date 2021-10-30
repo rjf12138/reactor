@@ -214,7 +214,7 @@ SubReactor::SubReactor(int events_max_size, int timeout)
 SubReactor::~SubReactor(void)
 {
     if (events_ != nullptr) {
-        delete events_;
+        delete []events_;
         events_ = nullptr;
     }
 }
@@ -439,7 +439,7 @@ MainReactor::MainReactor(int events_max_size, int timeout)
 MainReactor::~MainReactor(void)
 {
     if (events_ != nullptr) {
-        delete events_;
+        delete []events_;
         events_ = nullptr;
     }
 }
@@ -473,11 +473,12 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
         return -1;
     }
 
-    struct epoll_event *ep_events = new epoll_event; // TODO: 释放这里的内存,https://blog.csdn.net/abcjennifer/article/details/49227333
-    ep_events->events = EPOLLIN | EPOLLERR;
-    ep_events->data.fd = handle_ptr->acceptor->get_socket();
-    LOG_INFO("Add acceptor: %d", ep_events->data.fd);
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, ep_events->data.fd, ep_events);
+    struct epoll_event ep_events; // TODO: 释放这里的内存,https://blog.csdn.net/abcjennifer/article/details/49227333
+    memset(&ep_events, 0, sizeof(epoll_event));
+    ep_events.events = EPOLLIN | EPOLLERR;
+    ep_events.data.fd = handle_ptr->acceptor->get_socket();
+    LOG_INFO("Add acceptor: %d", ep_events.data.fd);
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, ep_events.data.fd, &ep_events);
     if (ret < 0) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
         return -1;
