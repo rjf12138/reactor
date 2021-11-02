@@ -59,8 +59,7 @@ int
 MsgHandleCenter::set_config(const ReactorConfig_t &config)
 {
     os::ThreadPoolConfig threadpool_config = thread_pool_.get_threadpool_config();
-    threadpool_config.max_thread_num = config.max_thread_num;
-    threadpool_config.min_thread_num = config.min_thread_num;
+    threadpool_config.threads_num = config.threads_num;
     threadpool_config.max_waiting_task = config.max_wait_task;
     thread_pool_.set_threadpool_config(threadpool_config);
 

@@ -167,8 +167,8 @@ enum ThreadState {
 };
 
 class ThreadPool;
+typedef uint64_t thread_id_t;
 class WorkThread : public Thread {
-    friend ThreadPool;
 public:
     WorkThread(ThreadPool *thread_pool, int idle_life = 30);
     virtual ~WorkThread(void);
@@ -184,7 +184,7 @@ public:
     // 继续执行线程
     virtual int resume(void);
 
-    virtual int64_t get_thread_id(void) const {return thread_id_;}
+    virtual thread_id_t get_thread_id(void) const {return thread_id_;}
     virtual int get_current_state(void) const {return state_;}
     virtual int idle_timeout(void);
     virtual int reset_idle_life(void);
@@ -196,7 +196,7 @@ private:
     time_t idle_life_; // 单位：秒
     time_t start_idle_life_;
     int state_;
-    int64_t thread_id_;
+    thread_id_t thread_id_;
 
     Task task_;
     Mutex mutex_;
@@ -217,8 +217,7 @@ enum ThreadPoolExitAction {
 };
 
 struct ThreadPoolConfig {
-    std::size_t min_thread_num;             // 最小线程数
-    std::size_t max_thread_num;             // 最大线程数
+    std::size_t threads_num;             // 最小线程数
     std::size_t max_waiting_task;           // 缓存中保存的最大任务数
     int idle_thread_life;                   // 空闲线程的存在
     ThreadPoolExitAction threadpool_exit_action; // 默认时强制关闭所有线程
@@ -268,25 +267,28 @@ private:
     // 关闭线程池中的所有线程
     int shutdown_all_threads(void);
 
+    // 移除已经关闭的工作线程信息
+    // 注意：使用时要确保线程已经结束了
+    int remove_thread(thread_id_t thread_id);
+
     // 获取任务，优先队列中的任务先被取出,有任务返回大于0，否则返回等于0
     // 除了工作线程之外，其他任何代码都不要去调用该函数，否则会导致的任务丢失
     int get_task(Task &task);
-
-    // 移除已经关闭的工作线程信息
-    // 注意：使用时要确保线程已经结束了
-    int remove_thread(int64_t thread_id);
 
     // 工作线程初始化以及动态调整线程数量
     // 任务的分配
     int manage_work_threads(bool is_init);
 
+    // 休眠指定线程
+    int thread_move_to_idle_map(thread_id_t thread_id);
+    // 运行指定线程
+    int thread_move_to_running_map(thread_id_t thread_id);
+    // 随机唤醒一个线程
+    int thread_move_to_running_map(int thread_cnt);
+    
     // 打印线程池信息
     static void *print_threadpool_info(void *arg);
 
-private:
-    int thread_move_to_idle_map(int64_t thread_id);
-    int thread_move_to_running_map(int64_t thread_id);
-    
 private:
     bool print_info_;
     bool exit_;
@@ -298,8 +300,8 @@ private:
 
     ds::Queue<Task> tasks_;   // 普通任务队列
     ds::Queue<Task> priority_tasks_; // 优先任务队列
-    std::map<int64_t, WorkThread*> runing_threads_; // 运行中的线程列表
-    std::map<int64_t, WorkThread*> idle_threads_; // 空闲的线程列表
+    std::map<thread_id_t, WorkThread*> runing_threads_; // 运行中的线程列表
+    std::map<thread_id_t, WorkThread*> idle_threads_; // 空闲的线程列表
 };
 
 /////////////////////////////// 文件流 ////////////////////////////////////////////////////
