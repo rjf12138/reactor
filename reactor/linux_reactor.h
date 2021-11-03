@@ -36,8 +36,8 @@ public:
 
 private:
     SendDataCenter(void);
-    SendDataCenter(const MsgHandleCenter&) = delete;
-    SendDataCenter& operator=(const MsgHandleCenter&) = delete;
+    SendDataCenter(const SendDataCenter&) = delete;
+    SendDataCenter& operator=(const SendDataCenter&) = delete;
 
     static void* send_loop(void* arg);
     static void* exit_loop(void* arg);
