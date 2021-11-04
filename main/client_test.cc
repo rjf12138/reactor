@@ -26,7 +26,7 @@ int main(int argc, char **argv)
         } else if (ch == 's') {
             for (int i = 0; i < 10000; ++i) {
                 client.send_data(buffer);
-                os::Time::sleep(5);
+                os::Time::sleep(2);
             }
             LOG_GLOBAL_INFO("send over!");
         }

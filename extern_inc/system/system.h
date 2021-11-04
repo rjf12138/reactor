@@ -71,6 +71,10 @@ public:
     static std::string convert_to(const mtime_t &ti, bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
 
 private:
+    Time(const Time&) = delete;
+    Time& operator=(const Time&) = delete;
+
+private:
     mtime_t time_;
 };
 /////////////////////////////// 获取系统信息 ////////////////////////////////////////
@@ -95,13 +99,19 @@ public:
     virtual int trylock(void);
     virtual int unlock(void);
     virtual int get_errno(void) { return errno_;}
+
 #ifdef __RJF_LINUX__
-    pthread_mutex_t* get_mutex(void) {return &mutex_;}
+    pthread_mutex_t* get_mutex(void) {return mutex_ptr_;}
 #endif
+
+private:
+    Mutex(const Mutex&) = delete;
+    Mutex& operator=(const Mutex&) = delete;
+
 private:
     int errno_;
 #ifdef __RJF_LINUX__
-    pthread_mutex_t mutex_;
+    pthread_mutex_t *mutex_ptr_;
 #endif
 };
 
@@ -119,8 +129,8 @@ public:
     Thread(void);
     virtual ~Thread(void);
 
+    // 线程初始化
     virtual int init(void);
-    virtual int wait_thread(void);
 
     // 以下函数需要重载
     // 线程调用的主体
@@ -132,6 +142,10 @@ public:
 
 private:
     static void* create_func(void *arg);
+
+private:
+    Thread(const Thread&) = delete;
+    Thread& operator=(const Thread&) = delete;
 
 private:
     bool is_init_;
@@ -155,6 +169,13 @@ struct Task {
     void *exit_arg;
     thread_callback work_func;
     thread_callback exit_task;
+
+    Task()
+    :state(THREAD_TASK_WAIT),
+    thread_arg(nullptr),
+    exit_arg(nullptr),
+    work_func(nullptr),
+    exit_task(nullptr) {}
 };
 
 // thread_pool 的工作线程。
@@ -184,19 +205,22 @@ public:
     // 继续执行线程
     virtual int resume(void);
 
-    virtual thread_id_t get_thread_id(void) const {return thread_id_;}
+    virtual thread_id_t get_thread_id(void) const {return work_thread_id_;}
     virtual int get_current_state(void) const {return state_;}
-    virtual int idle_timeout(void);
-    virtual int reset_idle_life(void);
 
 private:
     void thread_cond_wait(void);
     void thread_cond_signal(void);
+
+private:
+    WorkThread(const WorkThread&) = delete;
+    WorkThread& operator=(const WorkThread&) = delete;
+
 private:
     time_t idle_life_; // 单位：秒
     time_t start_idle_life_;
     int state_;
-    thread_id_t thread_id_;
+    thread_id_t work_thread_id_;
 
     Task task_;
     Mutex mutex_;
@@ -217,9 +241,8 @@ enum ThreadPoolExitAction {
 };
 
 struct ThreadPoolConfig {
-    std::size_t threads_num;             // 最小线程数
-    std::size_t max_waiting_task;           // 缓存中保存的最大任务数
-    int idle_thread_life;                   // 空闲线程的存在
+    std::size_t threads_num;             // 线程数
+    std::size_t max_waiting_task;        // 缓存中保存的最大任务数
     ThreadPoolExitAction threadpool_exit_action; // 默认时强制关闭所有线程
 };
 
@@ -267,17 +290,9 @@ private:
     // 关闭线程池中的所有线程
     int shutdown_all_threads(void);
 
-    // 移除已经关闭的工作线程信息
-    // 注意：使用时要确保线程已经结束了
-    int remove_thread(thread_id_t thread_id);
-
     // 获取任务，优先队列中的任务先被取出,有任务返回大于0，否则返回等于0
     // 除了工作线程之外，其他任何代码都不要去调用该函数，否则会导致的任务丢失
     int get_task(Task &task);
-
-    // 工作线程初始化以及动态调整线程数量
-    // 任务的分配
-    int manage_work_threads(bool is_init);
 
     // 休眠指定线程
     int thread_move_to_idle_map(thread_id_t thread_id);
@@ -288,6 +303,10 @@ private:
     
     // 打印线程池信息
     static void *print_threadpool_info(void *arg);
+
+private:
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool& operator=(const ThreadPool&) = delete;
 
 private:
     bool print_info_;
@@ -355,6 +374,10 @@ public:
     ssize_t write_file_fmt(const char *fmt, ...);
 
 private:
+    File(const File&) = delete;
+    File& operator=(const File&) = delete;
+
+private:
     int fd_;
     bool open_on_exit_;
     bool file_open_flag_;
@@ -408,6 +431,11 @@ public:
     // SHUT_RD(关闭读端)
     // SHUT_RDWR(关闭读和写)
     int shutdown(int how);
+
+private:
+    SocketTCP(const SocketTCP&) = delete;
+    SocketTCP& operator=(const SocketTCP&) = delete;
+
 private:
     bool is_enable_;
     int socket_;
