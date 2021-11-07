@@ -44,7 +44,7 @@
 			
 		]
 	},
-	"MainFileName": "server_test.cc",
+	"MainFileName": "client_test.cc",
 	"Name": "reactor",
 	"Path": "/home/ruanjian/workspace/project_v/reactor",
 	"ProgramRunArgs": "",

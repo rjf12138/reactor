@@ -52,7 +52,6 @@ MsgHandleCenter::MsgHandleCenter(void)
 
 MsgHandleCenter::~MsgHandleCenter(void)
 {
-    thread_pool_.stop_handler();
 }
 
 int 
