@@ -1,3 +1,0 @@
-/home/ruanjian/workspace/project_v/reactor/build/CMakeFiles/rebuild_cache.dir
-/home/ruanjian/workspace/project_v/reactor/build/CMakeFiles/edit_cache.dir
-/home/ruanjian/workspace/project_v/reactor/build/CMakeFiles/reactor.dir
