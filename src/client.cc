@@ -41,7 +41,7 @@ NetClient::connect(const std::string &url)
         LOG_WARN("Connect Failed[%s: %d]", url_parser_.addr_.c_str(), url_parser_.port_);
         return -1;
     }
-    client_conn_ptr->client_id = client_conn_ptr->socket_ptr->get_socket_state();
+    client_conn_ptr->client_id = client_conn_ptr->socket_ptr->get_socket();
 
     handle_.exit = false;
     handle_.server_id = sid_;

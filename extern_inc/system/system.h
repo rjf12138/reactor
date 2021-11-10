@@ -184,6 +184,7 @@ struct Task {
 enum ThreadState {
     WorkThread_RUNNING,
     WorkThread_WAITING,
+    WorkThread_WAITINGEXIT,
     WorkThread_EXIT,
 };
 
@@ -206,7 +207,7 @@ public:
     virtual int resume(void);
 
     virtual thread_id_t get_thread_id(void) const {return work_thread_id_;}
-    virtual int get_current_state(void) const {return state_;}
+    virtual ThreadState get_current_state(void) const {return state_;}
 
 private:
     void thread_cond_wait(void);
@@ -219,7 +220,7 @@ private:
 private:
     time_t idle_life_; // 单位：秒
     time_t start_idle_life_;
-    int state_;
+    ThreadState state_;
     thread_id_t work_thread_id_;
 
     Task task_;
@@ -283,9 +284,6 @@ public:
     // 实时打印当前线程池信息
     void show_threadpool_info(void);
 
-    // 获取线程池状态
-    ThreadState get_state(void) {return state_;}
-
 private:
     // 关闭线程池中的所有线程
     int shutdown_all_threads(void);
@@ -300,6 +298,8 @@ private:
     int thread_move_to_running_map(thread_id_t thread_id);
     // 随机唤醒一个线程
     int thread_move_to_running_map(int thread_cnt);
+    // 调整线程数量
+    int ajust_threads_num(void);
     
     // 打印线程池信息
     static void *print_threadpool_info(void *arg);
@@ -311,7 +311,6 @@ private:
 private:
     bool print_info_;
     bool exit_;
-    ThreadState state_;
     ThreadPoolConfig thread_pool_config_;// 多余的空闲线程会被杀死，直到数量达到最小允许的线程数为止。单位：秒
 
     Mutex thread_mutex_;

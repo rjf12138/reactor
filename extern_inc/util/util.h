@@ -97,7 +97,6 @@ typedef uint32_t obj_id_t;
 class MsgObject {
     typedef std::map<int, MsgObject*>  MSG_OBJECT_MAP;
     typedef std::map<std::string, std::pair<obj_id_t, std::set<obj_id_t>>>  SUBSCRIBE_TOPIC_OBJECTS_MAP;
-    typedef std::vector<MsgBuffer_Info_t*> MSG_BUFFER;
 public:
     MsgObject(void);
     virtual ~MsgObject(void);
@@ -107,7 +106,7 @@ public:
 
     // 消息收到时回调函数
     virtual int msg_handler(obj_id_t sender, const basic::ByteBuffer &msg);
-    // 发送消息（不需要主动设置发送ID）
+    // 发送消息（使用当前消息类作为发送ID）
     int send_msg(obj_id_t recv_id, const basic::ByteBuffer &msg);
 
     // 检查对象 ID 是否存在
@@ -173,7 +172,7 @@ private:
 
     // 消息缓冲区
     static os::ThreadPool msg_handle_pool_;
-    static MSG_BUFFER msg_buffer_;
+    static MsgBuffer_Info_t msg_buffer_[MAX_HANDER_THREAD];
 };
 } // namespace util
 

@@ -52,6 +52,7 @@ MsgHandleCenter::MsgHandleCenter(void)
 
 MsgHandleCenter::~MsgHandleCenter(void)
 {
+    LOG_GLOBAL_DEBUG("MsgHandleCenter::~MsgHandleCenter");
 }
 
 int 
@@ -160,7 +161,7 @@ SendDataCenter::send_loop(void* arg)
             iter->second->socket_ptr->send(iter->second->send_buffer);
         }
     }
-
+    LOG_GLOBAL_DEBUG("Exit SendDataCenter....");
     return nullptr;
 }
 
@@ -173,7 +174,7 @@ SendDataCenter::exit_loop(void* arg)
 
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
     sender_ptr->send_exit_ = true;
-
+    LOG_GLOBAL_DEBUG("Exit exit looping....");
     return nullptr;
 }
 
@@ -198,15 +199,15 @@ SubReactor::SubReactor(int events_max_size, int timeout)
     epfd_ = epoll_create(5);
     if (epfd_ == -1) {
         LOG_ERROR("epoll_create: %s", strerror(errno));
+    } else {
+        os::Task task;
+        task.work_func = SubReactor::event_wait;
+        task.exit_task = SubReactor::event_exit;
+        task.thread_arg = this;
+        task.exit_arg = this;
+
+        MsgHandleCenter::instance().add_task(task);
     }
-
-    os::Task task;
-    task.work_func = SubReactor::event_wait;
-    task.exit_task = SubReactor::event_exit;
-    task.thread_arg = this;
-    task.exit_arg = this;
-
-    MsgHandleCenter::instance().add_task(task);
 }
 
 SubReactor::~SubReactor(void)
@@ -384,7 +385,7 @@ SubReactor::event_wait(void *arg)
             }
         }
     }
-
+    LOG_GLOBAL_DEBUG("Exit SubReactor....");
     return nullptr;
 }
 
@@ -398,7 +399,7 @@ SubReactor::event_exit(void *arg)
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
     epoll_ptr->exit_ = true;
-
+    LOG_GLOBAL_DEBUG("Exit event_exit....");
     return nullptr;
 }
 
@@ -471,11 +472,11 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
         return -1;
     }
 
-    struct epoll_event ep_events; // TODO: 释放这里的内存,https://blog.csdn.net/abcjennifer/article/details/49227333
+    struct epoll_event ep_events;
     memset(&ep_events, 0, sizeof(epoll_event));
     ep_events.events = EPOLLIN | EPOLLERR;
     ep_events.data.fd = handle_ptr->acceptor->get_socket();
-    LOG_INFO("Add acceptor: %d", ep_events.data.fd);
+    LOG_INFO("Add server acceptor: %d", ep_events.data.fd);
     int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, ep_events.data.fd, &ep_events);
     if (ret < 0) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
@@ -563,14 +564,14 @@ MainReactor::event_wait(void *arg)
                     delete client_conn_ptr;
                     continue;
                 }
-
+                LOG_GLOBAL_INFO("Add client[%s]", client_conn_ptr->socket_ptr->get_ip_info().c_str());
                 if (handle_ptr->client_conn_func != nullptr) {
                     handle_ptr->client_conn_func(client_conn_ptr->client_id, handle_ptr->client_arg);
                 }
             }
         }
     }
-
+    LOG_GLOBAL_DEBUG("Exit MainReactor::event_wait....");
     return nullptr;
 }
 
@@ -584,7 +585,7 @@ MainReactor::event_exit(void *arg)
 
     MainReactor *epoll_ptr = (MainReactor*)arg;
     epoll_ptr->exit_ = true;
-
+    LOG_GLOBAL_DEBUG("Exit MainReactor::event_exit....");
     return nullptr;
 }
 
