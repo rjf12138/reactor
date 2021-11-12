@@ -47,17 +47,24 @@ MsgHandleCenter::instance(void)
 
 MsgHandleCenter::MsgHandleCenter(void)
 {
-    // thread_pool_.show_threadpool_info();
+    //thread_pool_.show_threadpool_info();
+    ReactorConfig rconfig;
+    rconfig.threads_num = 4;
+    rconfig.max_wait_task = 1000;
+    this->set_config(rconfig);
 }
 
 MsgHandleCenter::~MsgHandleCenter(void)
 {
-    LOG_GLOBAL_DEBUG("MsgHandleCenter::~MsgHandleCenter");
 }
 
 int 
 MsgHandleCenter::set_config(const ReactorConfig_t &config)
 {
+    if (config.threads_num < 4) {
+        LOG_GLOBAL_WARN("The reactor requires at least 4 threads![Input: %d]", config.threads_num);
+        return -1;
+    }
     os::ThreadPoolConfig threadpool_config = thread_pool_.get_threadpool_config();
     threadpool_config.threads_num = config.threads_num;
     threadpool_config.max_waiting_task = config.max_wait_task;
@@ -161,7 +168,6 @@ SendDataCenter::send_loop(void* arg)
             iter->second->socket_ptr->send(iter->second->send_buffer);
         }
     }
-    LOG_GLOBAL_DEBUG("Exit SendDataCenter....");
     return nullptr;
 }
 
@@ -174,7 +180,7 @@ SendDataCenter::exit_loop(void* arg)
 
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
     sender_ptr->send_exit_ = true;
-    LOG_GLOBAL_DEBUG("Exit exit looping....");
+
     return nullptr;
 }
 
@@ -385,7 +391,7 @@ SubReactor::event_wait(void *arg)
             }
         }
     }
-    LOG_GLOBAL_DEBUG("Exit SubReactor....");
+    
     return nullptr;
 }
 
@@ -399,7 +405,7 @@ SubReactor::event_exit(void *arg)
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
     epoll_ptr->exit_ = true;
-    LOG_GLOBAL_DEBUG("Exit event_exit....");
+    
     return nullptr;
 }
 
@@ -571,7 +577,7 @@ MainReactor::event_wait(void *arg)
             }
         }
     }
-    LOG_GLOBAL_DEBUG("Exit MainReactor::event_wait....");
+    
     return nullptr;
 }
 
@@ -585,7 +591,7 @@ MainReactor::event_exit(void *arg)
 
     MainReactor *epoll_ptr = (MainReactor*)arg;
     epoll_ptr->exit_ = true;
-    LOG_GLOBAL_DEBUG("Exit MainReactor::event_exit....");
+    
     return nullptr;
 }
 

@@ -3,6 +3,14 @@
 
 #include "reactor.h"
 
+/********************************************************
+* 线程数分配（至少4个线程）：
+* SubReactor： 一个线程
+* MainReactor: 一个线程
+* SendDataCenter： 至少一个线程
+* 处理客户端发送的数据： 至少一个线程
+*********************************************************/
+
 namespace reactor {
 
 class MsgHandleCenter {
@@ -24,7 +32,6 @@ private:
 };
 
 ///////////////////////////// 发送数据处理 ////////////////////////////////////////////
-// TODO: 如何为 senddatacenter 分配线程， 以及添加写注册
 class SendDataCenter {
 public:
     static SendDataCenter& instance(void);
@@ -71,8 +78,6 @@ public:
     static void* event_wait(void *arg);
     // 事件退出函数
     static void* event_exit(void *arg);
-    // 发送返回的消息
-    static void* event_send(void *arg); 
 
 private:
     inline EventHandle_t* get_event_handle(int client_sock);
@@ -110,8 +115,6 @@ public:
     static void* event_wait(void *arg);
     // 事件退出函数
     static void* event_exit(void *arg);
-    // 发送返回的消息
-    static void* event_send(void *arg); 
 
 private:
     MainReactor(int events_max_size_ = 32, int timeout = 3000);

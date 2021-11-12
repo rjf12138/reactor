@@ -108,6 +108,7 @@ NetClient::send_data(const ByteBuffer &buff)
     ClientConn_t* client_conn_ptr = handle_.client_conn[cid_];
     client_conn_ptr->buff_mutex.lock();
     client_conn_ptr->send_buffer += buff;
+    LOG_GLOBAL_DEBUG("buffer_size: %ld", client_conn_ptr->send_buffer.data_size());
     client_conn_ptr->buff_mutex.unlock();
 
     SendDataCenter::instance().send_data(client_conn_ptr->client_id);
