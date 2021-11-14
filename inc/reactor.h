@@ -17,7 +17,7 @@ enum NetConnectState {
     NetConnectState_Connected,
 };
 
-class NetClient : public basic::Logger{
+class NetClient : public basic::Logger, public util::MsgObject {
 public:
     NetClient(void);
     virtual ~NetClient(void);
@@ -32,12 +32,17 @@ public:
     // 获取客户端当前状态
     NetConnectState get_state(void);
     // 设置客户端当前状态
-    void set_state(NetConnectState state) {state_ = state;}
+    void set_state(NetConnectState state);
 
     // 发送数据到服务器上
     ssize_t send_data(const ByteBuffer &buff);
+
     // 处理服务器发送的数据
     virtual int handle_msg(basic::ByteBuffer &buffer);
+    // 对端连接断开通知
+    virtual int notify_client_disconnected(client_id_t cid);
+    // 进程内消息收到时回调函数
+    virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
 
 private:
     static void* client_func(void* arg);// arg: EventHandle_t
@@ -127,6 +132,8 @@ public:
     virtual int handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl);
     // 客户端连接到服务器时会调用
     virtual int handle_client_conn(client_id_t cid);
+    // 客户端连接断开时会调用
+    virtual int notify_client_disconnected(client_id_t cid);
 
     // 进程内消息收到时回调函数
     virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);

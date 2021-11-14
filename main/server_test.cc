@@ -4,30 +4,31 @@ using namespace reactor;
 
 class TestServer : public NetServer {
 public:
-    TestServer(void) {}
+    TestServer(void) {
+        start_time = last_time = 0;
+    }
     ~TestServer(void) {}
 
     virtual int handle_msg(client_id_t cid, basic::ByteBuffer &buffer) {
-        if (is_first == false) {
-            is_first = true;
+        if (os::Time::now() - last_time > 3000) {
             start_time = os::Time::now();
             last_time = start_time;
-            recv_file.open("./recv_file.mp4");
+            recv_size = 0;
         }
         recv_size += buffer.data_size();
-        if (os::Time::now() - last_time > 5000) {
-            LOG_TRACE("recv_speed: %lf B/ms", (double)recv_size / (os::Time::now() - start_time));
+        if (os::Time::now() - last_time > 2000) {
+            LOG_TRACE("recv bytes: %ld bytes, recv_speed: %lf bytes/ms", recv_size, (double)recv_size / (os::Time::now() - start_time));
             last_time = os::Time::now();
         }
-
-        recv_file.write(buffer, buffer.data_size());
-        // LOG_TRACE("Client request: %s", buffer.str().c_str());
-        // return send_data(cid, buffer);
         return 0;
     }
+
+    int notify_client_disconnected(client_id_t cid) {
+        LOG_TRACE("server client disconnected[cid: %d]", cid);
+        return 0;
+    }
+
 private:
-    os::File recv_file;
-    bool is_first = false;
     uint64_t recv_size = 0;
     os::mtime_t start_time;
     os::mtime_t last_time;

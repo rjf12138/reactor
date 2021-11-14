@@ -49,7 +49,7 @@ MsgHandleCenter::MsgHandleCenter(void)
 {
     //thread_pool_.show_threadpool_info();
     ReactorConfig rconfig;
-    rconfig.threads_num = 4;
+    rconfig.threads_num = 5;
     rconfig.max_wait_task = 1000;
     this->set_config(rconfig);
 }
@@ -61,8 +61,8 @@ MsgHandleCenter::~MsgHandleCenter(void)
 int 
 MsgHandleCenter::set_config(const ReactorConfig_t &config)
 {
-    if (config.threads_num < 4) {
-        LOG_GLOBAL_WARN("The reactor requires at least 4 threads![Input: %d]", config.threads_num);
+    if (config.threads_num < 5) {
+        LOG_GLOBAL_WARN("The reactor requires at least 5 threads![Input: %d]", config.threads_num);
         return -1;
     }
     os::ThreadPoolConfig threadpool_config = thread_pool_.get_threadpool_config();
@@ -337,6 +337,15 @@ SubReactor::remove_client_conn(server_id_t sid, client_id_t cid)
 
     delete del_conn_ptr; // 销毁ClientConn_t时会自动关闭连接
     
+    if (handle_ptr->acceptor == nullptr) { // 客户端acceptor 是nullptr
+        NetClient* connect_ptr = reinterpret_cast<NetClient*>(handle_ptr->server_id);
+        connect_ptr->set_state(NetConnectState_Dissconnected);
+        connect_ptr->notify_client_disconnected(cid);
+    } else {
+        NetServer* connect_ptr = reinterpret_cast<NetServer*>(handle_ptr->server_id);
+        connect_ptr->notify_client_disconnected(cid);
+    }
+
     return 0;
 }
 
@@ -378,6 +387,7 @@ SubReactor::event_wait(void *arg)
             } else if (epoll_ptr->events_[i].events & EPOLLIN){
                 handle_ptr->ready_sock_mutex.lock();
                 handle_ptr->ready_sock.push(ready_socket_fd);
+                LOG_GLOBAL_TRACE("ready_socket_fd： %d", ready_socket_fd);
                 if (handle_ptr->state == EventHandleState_Idle) {
                     handle_ptr->state = EventHandleState_Ready;
 
@@ -514,8 +524,9 @@ MainReactor::remove_server_accept(server_id_t sid)
     accept_iter->second->exit = true;
     auto iter = accept_iter->second->client_conn.begin();
     auto end_iter = accept_iter->second->client_conn.end();
-    for (; iter != end_iter; ++iter) {
-        SubReactor::instance().remove_client_conn(sid, iter->first);
+    for (; iter != end_iter; ) {
+        auto stop_iter = iter++;
+        SubReactor::instance().remove_client_conn(sid, stop_iter->first);
     }
     accept_iter->second->acceptor->close();
     acceptor_.erase(accept_iter);

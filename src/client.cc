@@ -97,6 +97,15 @@ NetClient::get_state(void)
     return state_;
 }
 
+void 
+NetClient::set_state(NetConnectState state)
+{
+    state_ = state;
+    if (state == NetConnectState_Dissconnected) {
+        client_conn_ptr_ = nullptr;
+    }
+}
+
 ssize_t 
 NetClient::send_data(const ByteBuffer &buff)
 {
@@ -108,7 +117,6 @@ NetClient::send_data(const ByteBuffer &buff)
     ClientConn_t* client_conn_ptr = handle_.client_conn[cid_];
     client_conn_ptr->buff_mutex.lock();
     client_conn_ptr->send_buffer += buff;
-    LOG_GLOBAL_DEBUG("buffer_size: %ld", client_conn_ptr->send_buffer.data_size());
     client_conn_ptr->buff_mutex.unlock();
 
     SendDataCenter::instance().send_data(client_conn_ptr->client_id);
@@ -118,6 +126,18 @@ NetClient::send_data(const ByteBuffer &buff)
 
 int 
 NetClient::handle_msg(ByteBuffer &buffer)
+{
+    return 0;
+}
+
+int
+NetClient::notify_client_disconnected(client_id_t cid)
+{
+    return 0;
+}
+
+int 
+NetClient::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
 {
     return 0;
 }

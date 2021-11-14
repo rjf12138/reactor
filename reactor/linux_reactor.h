@@ -4,7 +4,8 @@
 #include "reactor.h"
 
 /********************************************************
-* 线程数分配（至少4个线程）：
+* 线程数分配（至少5个线程）：
+* 实时打印线程信息： 取决于 MsgHandleCenter 是否开启
 * SubReactor： 一个线程
 * MainReactor: 一个线程
 * SendDataCenter： 至少一个线程

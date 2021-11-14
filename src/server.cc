@@ -98,6 +98,13 @@ NetServer::handle_client_conn(client_id_t cid)
     return 0;
 }
 
+int 
+NetServer::notify_client_disconnected(client_id_t cid)
+{
+    // 如果在客户端连接断开时需要处理一些事务，可以重载这个函数
+    return 0;
+}
+
 void* 
 NetServer::client_func(void* arg)
 {

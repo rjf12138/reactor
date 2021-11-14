@@ -11,6 +11,11 @@ public:
         LOG_TRACE("server_response: %s", buffer.str().c_str());
         return 0;
     }
+
+    int notify_client_disconnected(client_id_t cid) {
+        LOG_TRACE("client disconnected[cid: %d]", cid);
+        return 0;
+    }
 };
 
 int main(int argc, char **argv)
@@ -18,28 +23,27 @@ int main(int argc, char **argv)
     TestClient client;
     client.connect("raw://192.168.0.103:12138");
 
-    basic::ByteBuffer buffer(std::string("Hello, world!\n"));
+    uint32_t send_gap = 2; // 单位：ms
+    uint64_t send_size = 100;
+    uint64_t send_counts = 10000;
+    std::string str;
+    for (int i = 0; i < send_size; ++i) {
+        str += 'H';
+    }
+    basic::ByteBuffer buffer(str);
+
     while (true) {
         char ch = getchar();
         if (ch == 'q') {
             break;
         } else if (ch == 's') {
-            os::File send_file;
-            send_file.open("/media/ruanjian/data/adv_immu/[44x.me]SSPD-144.mp4");
-            buffer.clear();
-            while(true) {
-                int read_size = send_file.read(buffer, 2000);
-                if (read_size <= 0) {
-                    break;
-                }
+            os::mtime_t start_time = os::Time::now();
+            for (int i = 0; i < send_counts; ++i) {
                 client.send_data(buffer);
-                os::Time::sleep(100);
+                os::Time::sleep(send_gap);
             }
-            // for (int i = 0; i < 10000; ++i) {
-            //     client.send_data(buffer);
-            //     os::Time::sleep(2);
-            // }
-            LOG_GLOBAL_INFO("send over!");
+            uint64_t total_size = send_size * send_counts;
+            LOG_GLOBAL_TRACE("send over![send_total_size: %ld bytes, send_speed: %lf bytes/ms]", total_size, static_cast<double>(total_size) / (os::Time::now() - start_time));
         }
     }
 
