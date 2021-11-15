@@ -46,7 +46,7 @@ NetClient::connect(const std::string &url)
     handle_.exit = false;
     handle_.server_id = sid_;
     handle_.acceptor = nullptr;
-    handle_.events = EventType_In | EventType_RDHup | EventType_Err | EventType_ET;
+    handle_.events = EventType_In | EventType_RDHup | EventType_Err /*| EventType_ET*/;
     handle_.method = EventMethod_Epoll;
     
     handle_.client_arg = this;
@@ -71,12 +71,6 @@ NetClient::connect(const std::string &url)
     state_ = NetConnectState_Connected;
 
     return ret;
-}
-
-int 
-NetClient::reconnect(void)
-{
-    return connect(url_);
 }
 
 int 
@@ -167,7 +161,8 @@ NetClient::client_func(void* arg)
     if (size <= 0) {
         goto end;
     }
-    if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Raw) {
+
+    if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Tcp) {
         client_ptr->handle_msg(buffer);
         buffer.clear();
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Http) {

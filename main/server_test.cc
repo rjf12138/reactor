@@ -20,6 +20,8 @@ public:
             LOG_TRACE("recv bytes: %ld bytes, recv_speed: %lf bytes/ms", recv_size, (double)recv_size / (os::Time::now() - start_time));
             last_time = os::Time::now();
         }
+
+        send_data(cid, buffer);
         return 0;
     }
 
@@ -37,7 +39,7 @@ private:
 int main(int argc, char **argv)
 {
     TestServer server;
-    server.start("192.168.0.103", 12138, ptl::ProtocolType_Raw);
+    server.start("192.168.0.103", 12138, ptl::ProtocolType_Tcp);
 
     while (true) {
         char ch = getchar();

@@ -79,6 +79,18 @@ MsgHandleCenter::add_task(os::Task &task)
     return thread_pool_.add_task(task);
 }
 
+int 
+MsgHandleCenter::add_timer(util::TimerEvent_t event)
+{
+    return timer_.add(event);
+}
+
+int 
+MsgHandleCenter::cancel_timer(int timer_id)
+{
+    return timer_.cancel(timer_id);
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 SendDataCenter& 
 SendDataCenter::instance(void)
@@ -387,7 +399,6 @@ SubReactor::event_wait(void *arg)
             } else if (epoll_ptr->events_[i].events & EPOLLIN){
                 handle_ptr->ready_sock_mutex.lock();
                 handle_ptr->ready_sock.push(ready_socket_fd);
-                LOG_GLOBAL_TRACE("ready_socket_fd： %d", ready_socket_fd);
                 if (handle_ptr->state == EventHandleState_Idle) {
                     handle_ptr->state = EventHandleState_Ready;
 
@@ -492,7 +503,7 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
     memset(&ep_events, 0, sizeof(epoll_event));
     ep_events.events = EPOLLIN | EPOLLERR;
     ep_events.data.fd = handle_ptr->acceptor->get_socket();
-    LOG_INFO("Add server acceptor: %d", ep_events.data.fd);
+    LOG_INFO("Reactor add server acceptor: [socket: %d]", ep_events.data.fd);
     int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, ep_events.data.fd, &ep_events);
     if (ret < 0) {
         LOG_ERROR("epoll_ctl: %s", strerror(errno));
@@ -568,9 +579,9 @@ MainReactor::event_wait(void *arg)
             }
 
             int client_sock_fd = 0;
-            socklen_t addrlen = 0;
-            struct sockaddr addr;
-            if (handle_ptr->acceptor->accept(client_sock_fd, &addr, &addrlen) >= 0 && handle_ptr->exit == false) {
+            struct sockaddr_in addr;
+            socklen_t addrlen = sizeof(addr);
+            if (handle_ptr->acceptor->accept(client_sock_fd, (sockaddr*)&addr, &addrlen) >= 0 && handle_ptr->exit == false) {
                 ClientConn_t *client_conn_ptr = new ClientConn_t;
                 client_conn_ptr->client_id = client_sock_fd;
                 client_conn_ptr->socket_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
@@ -581,7 +592,7 @@ MainReactor::event_wait(void *arg)
                     delete client_conn_ptr;
                     continue;
                 }
-                LOG_GLOBAL_INFO("Add client[%s]", client_conn_ptr->socket_ptr->get_ip_info().c_str());
+                LOG_GLOBAL_INFO("Server add client[%s]", client_conn_ptr->socket_ptr->get_ip_info().c_str());
                 if (handle_ptr->client_conn_func != nullptr) {
                     handle_ptr->client_conn_func(client_conn_ptr->client_id, handle_ptr->client_arg);
                 }

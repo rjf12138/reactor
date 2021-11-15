@@ -19,8 +19,15 @@ public:
     static MsgHandleCenter& instance(void);
     virtual ~MsgHandleCenter(void);
 
+    // 设置线程池配置
     int set_config(const ReactorConfig_t &config);
+    // 添加线程任务
     int add_task(os::Task &task);
+
+    // 添加定时任务
+    int add_timer(util::TimerEvent_t event);
+    // 取消定时任务
+    int cancel_timer(int timer_id);
 
 private:
     MsgHandleCenter(void);
@@ -30,6 +37,8 @@ private:
 private:
     ReactorConfig_t config_;
     os::ThreadPool thread_pool_;
+
+    util::Timer timer_;   
 };
 
 ///////////////////////////// 发送数据处理 ////////////////////////////////////////////

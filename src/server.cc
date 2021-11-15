@@ -6,6 +6,7 @@ namespace reactor {
 NetServer::NetServer(void)
 {
     id_ = reinterpret_cast<server_id_t>(this);
+    state_ = NetConnectState_Dissconnected;
 }
 
 NetServer::~NetServer(void)
@@ -20,40 +21,55 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
     if (ret < 0) {
         return -1;
     }
-    server_.listen();
-    server_.setnonblocking();
-    server_.set_reuse_addr();
-
-    type_ = type;
-
-    handle_.exit = false;
-    handle_.server_id = id_;
-    handle_.acceptor = &server_;
-    handle_.events = EventType_In | EventType_RDHup | EventType_Err | EventType_ET;
-    handle_.method = EventMethod_Epoll;
     
-    handle_.client_arg = this;
-    handle_.client_func = client_func;
-    handle_.client_conn_func = client_conn_func;
+    if (server_.listen() >= 0 &&
+        server_.setnonblocking() >= 0 &&
+        server_.set_reuse_addr() >= 0) {
+            type_ = type;
+            handle_.exit = false;
+            handle_.server_id = id_;
+            handle_.acceptor = &server_;
+            handle_.events = EventType_In | EventType_RDHup | EventType_Err /*| EventType_ET*/;
+            handle_.method = EventMethod_Epoll;
+            
+            handle_.client_arg = this;
+            handle_.client_func = client_func;
+            handle_.client_conn_func = client_conn_func;
 
-    return MainReactor::instance().add_server_accept(&handle_);
+            state_ = NetConnectState_Listening;
+
+            return MainReactor::instance().add_server_accept(&handle_);
+    }
+    return -1;
 }
 
 int 
 NetServer::stop(void)
 {
-    return MainReactor::instance().remove_server_accept(id_);
+    if (state_ == NetConnectState_Listening) {
+        return MainReactor::instance().remove_server_accept(id_);
+    }
+    return 0;
 }
 
 int 
 NetServer::close_client(client_id_t cid)
 {
+    if (state_ != NetConnectState_Listening) {
+        LOG_WARN("Server not start listening!");
+        return -1;
+    }
     return MainReactor::instance().remove_client_conn(id_, cid);
 }
 
 ssize_t 
 NetServer::send_data(client_id_t id, const ByteBuffer &buff)
 {
+    if (state_ != NetConnectState_Listening) {
+        LOG_WARN("Server not start listening!");
+        return -1;
+    }
+
     ClientConn_t* client_conn_ptr = handle_.client_conn[id];
     client_conn_ptr->buff_mutex.lock();
     client_conn_ptr->send_buffer += buff;
@@ -114,7 +130,7 @@ NetServer::client_func(void* arg)
 
     NetServer *server_ptr = (NetServer*)arg;
     int ready_client_sock = 0;
-    while (true) {
+    while (server_ptr->state_ == NetConnectState_Listening) {
         server_ptr->handle_.ready_sock_mutex.lock();
         int ret = server_ptr->handle_.ready_sock.pop(ready_client_sock);
         if (ret <= 0) {
@@ -137,7 +153,7 @@ NetServer::client_func(void* arg)
             continue;
         }
 
-        if (server_ptr->type_ == ptl::ProtocolType_Raw) {
+        if (server_ptr->type_ == ptl::ProtocolType_Tcp) {
             server_ptr->handle_msg(id, buffer);
             buffer.clear();
         } else if (server_ptr->type_ == ptl::ProtocolType_Http) {

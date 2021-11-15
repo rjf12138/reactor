@@ -15,6 +15,7 @@ enum NetConnectState {
     NetConnectState_Dissconnected,
     NetConnectState_UpgradePtl,
     NetConnectState_Connected,
+    NetConnectState_Listening,
 };
 
 class NetClient : public basic::Logger, public util::MsgObject {
@@ -24,8 +25,6 @@ public:
     
     // tcp协议连接到服务器， url: raw://ip:port
     int connect(const std::string &url);
-    // 重新连接到服务器
-    int reconnect(void);
     // 与服务器断开连接
     int disconnect(void);
 
@@ -46,7 +45,6 @@ public:
 
 private:
     static void* client_func(void* arg);// arg: EventHandle_t
-
 protected:
     std::string url_;
     ptl::URLParser url_parser_;
@@ -148,6 +146,8 @@ private:
 
     ptl::ProtocolType type_;
     os::SocketTCP server_;
+
+    NetConnectState state_;
 };
 }
 
