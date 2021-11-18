@@ -27,7 +27,11 @@ public:
     int connect(const std::string &url);
     // 与服务器断开连接
     int disconnect(void);
+    // 添加定时任务
+    int add_timer_task(util::TimerEvent_t &event);
 
+    // 获取IP信息
+    std::string get_ip_info(void) {return client_conn_ptr_->socket_ptr->get_ip_info();}
     // 获取客户端当前状态
     NetConnectState get_state(void);
     // 设置客户端当前状态

@@ -7,7 +7,9 @@ public:
     TestServer(void) {
         start_time = last_time = 0;
     }
-    ~TestServer(void) {}
+    ~TestServer(void) 
+    {
+    }
 
     virtual int handle_msg(client_id_t cid, basic::ByteBuffer &buffer) {
         if (os::Time::now() - last_time > 3000) {
@@ -15,6 +17,7 @@ public:
             last_time = start_time;
             recv_size = 0;
         }
+        
         recv_size += buffer.data_size();
         if (os::Time::now() - last_time > 2000) {
             LOG_TRACE("recv bytes: %ld bytes, recv_speed: %lf bytes/ms", recv_size, (double)recv_size / (os::Time::now() - start_time));

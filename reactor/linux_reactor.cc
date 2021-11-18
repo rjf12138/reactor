@@ -100,7 +100,7 @@ SendDataCenter::instance(void)
 }
 
 SendDataCenter::SendDataCenter(void)
-:send_exit_(false)
+:state_(ReactorState_Exit)
 {
     os::Task task;
     task.work_func = send_loop;
@@ -157,7 +157,8 @@ SendDataCenter::send_loop(void* arg)
     }
 
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
-    while (sender_ptr->send_exit_ == false) {
+    sender_ptr->state_ = ReactorState_Running;
+    while (sender_ptr->state_ == ReactorState_Running) {
         if (sender_ptr->send_queue_.size() <= 0) {
             os::Time::sleep(5);
         }
@@ -180,6 +181,7 @@ SendDataCenter::send_loop(void* arg)
             iter->second->socket_ptr->send(iter->second->send_buffer);
         }
     }
+    sender_ptr->state_ = ReactorState_Exit;
     return nullptr;
 }
 
@@ -191,7 +193,11 @@ SendDataCenter::exit_loop(void* arg)
     }
 
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
-    sender_ptr->send_exit_ = true;
+    sender_ptr->state_ == ReactorState_WaitExit;
+    // 等待当前执行的任务退出
+    while (sender_ptr->state_ != ReactorState_Exit) {
+        os::Time::sleep(100);
+    }
 
     return nullptr;
 }
@@ -207,7 +213,7 @@ SubReactor::instance(void)
 SubReactor::SubReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
   timeout_(timeout),
-  exit_(false)
+  state_(ReactorState_Exit)
 {
     if (events_max_size_ < 0) {
         events_max_size_ = 32;
@@ -370,7 +376,8 @@ SubReactor::event_wait(void *arg)
     }
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
-    while (epoll_ptr->exit_ == false) {
+    epoll_ptr->state_ = ReactorState_Running;
+    while (epoll_ptr->state_ == ReactorState_Running) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
         if (ret == -1 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
@@ -413,6 +420,7 @@ SubReactor::event_wait(void *arg)
         }
     }
     
+    epoll_ptr->state_ = ReactorState_Exit;
     return nullptr;
 }
 
@@ -425,8 +433,11 @@ SubReactor::event_exit(void *arg)
     }
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
-    epoll_ptr->exit_ = true;
-    
+    epoll_ptr->state_ == ReactorState_WaitExit;
+    // 等待当前执行的任务退出
+    while (epoll_ptr->state_ != ReactorState_Exit) {
+        os::Time::sleep(100);
+    }
     return nullptr;
 }
 
@@ -441,7 +452,7 @@ MainReactor::instance(void)
 MainReactor::MainReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
   timeout_(timeout),
-  exit_(false)
+  state_(ReactorState_Exit)
 {
     if (events_max_size_ <= 0) {
         events_max_size_ = 32;
@@ -561,7 +572,8 @@ MainReactor::event_wait(void *arg)
     }
 
     MainReactor *epoll_ptr = (MainReactor*)arg;
-    while (epoll_ptr->exit_ == false) {
+    epoll_ptr->state_ = ReactorState_Running;
+    while (epoll_ptr->state_ == ReactorState_Running) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
         if (ret < 0 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
@@ -600,6 +612,7 @@ MainReactor::event_wait(void *arg)
         }
     }
     
+    epoll_ptr->state_ = ReactorState_Exit;
     return nullptr;
 }
 
@@ -612,8 +625,11 @@ MainReactor::event_exit(void *arg)
     }
 
     MainReactor *epoll_ptr = (MainReactor*)arg;
-    epoll_ptr->exit_ = true;
-    
+    epoll_ptr->state_ = ReactorState_WaitExit;
+    // 等待当前执行的任务退出
+    while (epoll_ptr->state_ != ReactorState_Exit) {
+        os::Time::sleep(100);
+    }
     return nullptr;
 }
 

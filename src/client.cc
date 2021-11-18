@@ -85,6 +85,12 @@ NetClient::disconnect(void)
     return 0;
 }
 
+int 
+NetClient::add_timer_task(util::TimerEvent_t &event)
+{
+    return MsgHandleCenter::instance().add_timer(event);
+}
+
 NetConnectState 
 NetClient::get_state(void)
 {

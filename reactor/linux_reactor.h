@@ -13,6 +13,11 @@
 *********************************************************/
 
 namespace reactor {
+enum ReactorState {
+    ReactorState_Running,
+    ReactorState_WaitExit,
+    ReactorState_Exit
+};
 
 class MsgHandleCenter {
 public:
@@ -47,9 +52,14 @@ public:
     static SendDataCenter& instance(void);
     virtual ~SendDataCenter(void);
 
+    // 向对端发送数据
     int send_data(client_id_t cid);
+    // 注册发送对象
     int register_connection(ClientConn_t *client_ptr);
+    // 移除发送对象
     int remove_connection(client_id_t cid);
+    // 获取状态
+    ReactorState state(void) const {return state_;}
 
 private:
     SendDataCenter(void);
@@ -62,7 +72,7 @@ private:
 private:
     static SendDataCenter *send_center_;
     
-    bool send_exit_;
+    ReactorState state_;
 
     os::Mutex send_mtx_;
     ds::Queue<client_id_t> send_queue_;
@@ -77,6 +87,8 @@ public:
     static SubReactor& instance(void);
     virtual ~SubReactor(void);
 
+    // 获取状态
+    ReactorState state(void) const {return state_;}
     // 注册服务
     int server_register(EventHandle_t *handle_ptr);
     // 添加新的客户端连接
@@ -97,9 +109,9 @@ private:
     SubReactor& operator=(const SubReactor&) = delete;
 
 private:
-    bool exit_;
-    int epfd_;
+    ReactorState state_;
 
+    int epfd_;
     int timeout_;
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
@@ -114,6 +126,8 @@ public:
     static MainReactor& instance(void);
     virtual ~MainReactor(void);
 
+    // 获取状态
+    ReactorState state(void) const {return state_;}
     // 添加服务端监听连接
     int add_server_accept(EventHandle_t *handle_ptr);
     // 删除服务端监听连接
@@ -133,9 +147,9 @@ private:
 
     inline EventHandle_t* get_event_handle(int listen_socket_fd);
 private:
-    bool exit_;
-    int epfd_;
+    ReactorState state_;
 
+    int epfd_;
     int timeout_;
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
@@ -144,7 +158,6 @@ private:
     std::map<int, server_id_t> server_listen_to_;
     std::map<server_id_t, EventHandle_t*> acceptor_;
 };
-
 
 }
 #endif
