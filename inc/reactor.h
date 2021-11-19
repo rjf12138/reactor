@@ -27,8 +27,11 @@ public:
     int connect(const std::string &url);
     // 与服务器断开连接
     int disconnect(void);
-    // 添加定时任务
-    int add_timer_task(util::TimerEvent_t &event);
+
+    // 添加定时任务。成功返回：定时器id
+    util::timer_id_t add_timer_task(util::TimerEvent_t &event);
+    // 取消定时任务
+    int cancel_timer_task(util::timer_id_t tid);
 
     // 获取IP信息
     std::string get_ip_info(void) {return client_conn_ptr_->socket_ptr->get_ip_info();}
@@ -67,10 +70,15 @@ public:
     HttpNetClient(void);
     virtual ~HttpNetClient(void);
 
-    // http 连接到服务器， url: http://ip:port/param, content： 需要发送的消息
-    int connect(const std::string &url, const basic::ByteBuffer &content);
+    // http 连接到服务器， url: http://ip:port/param, content： 连接时需要发送的消息
+    int connect(const std::string &url);
     // 断开与服务器的连接
     int disconnect(void);
+
+    // 添加定时任务。成功返回：定时器id
+    util::timer_id_t add_timer_task(util::TimerEvent_t &event) {return NetClient::add_timer_task(event);}
+    // 取消定时任务
+    int cancel_timer_task(util::timer_id_t tid) {return NetClient::cancel_timer_task(tid);}
 
     // 发送数据
     ssize_t send_data(ptl::HttpPtl &http_ptl);
@@ -92,6 +100,11 @@ public:
     int disconnect(basic::ByteBuffer &content);
     // 断开与服务端的连接
     int disconnect(void);
+
+    // 添加定时任务。成功返回：定时器id
+    util::timer_id_t add_timer_task(util::TimerEvent_t &event) {return NetClient::add_timer_task(event);}
+    // 取消定时任务
+    int cancel_timer_task(util::timer_id_t tid) {return NetClient::cancel_timer_task(tid);}
 
     // 发送数据
     ssize_t send_data(basic::ByteBuffer &content, int opcode, bool is_mask = false);
@@ -121,6 +134,13 @@ public:
     // 停止服务器
     int stop(void);
 
+    // 添加定时任务。成功返回：定时器id
+    util::timer_id_t add_timer_task(util::TimerEvent_t &event);
+    // 取消定时任务
+    int cancel_timer_task(util::timer_id_t tid);
+
+    // 获取IP信息
+    std::string get_ip_info(void) {return server_.get_ip_info();}
     // 关闭客户端连接, 参数 cid 可以从 handle_client_conn 中获取
     int close_client(client_id_t cid);
     // 发送数据给客户端

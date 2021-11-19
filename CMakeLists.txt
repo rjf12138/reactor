@@ -18,7 +18,7 @@ target_compile_options(reactor_compiler_flags INTERFACE
 
 # 设置生成文件输出路径
 set(EXECUTABLE_OUTPUT_PATH, ./output/debug/bin)
-add_executable(reactor ./main/server_test.cc)
+add_executable(reactor ./main/tcp_client_test.cc)
 
 target_include_directories(reactor PUBLIC ./inc/)
 target_include_directories(reactor PRIVATE ./extern_inc/)

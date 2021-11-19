@@ -5,26 +5,25 @@ using namespace reactor;
 class TestServer : public NetServer {
 public:
     TestServer(void) {
-        start_time = last_time = 0;
+        request_buffer.write_string("Request: Hello, world!!!!");
+        response_buffer.write_string("Response: Hello, world!!!!");
+
+        ptl_.set_response(HTTP_STATUS_OK, "OK");
+        ptl_.set_header_option(HTTP_HEADER_Host, get_ip_info());
+        ptl_.set_content(response_buffer);
     }
+
     ~TestServer(void) 
-    {
-    }
+    {}
 
-    virtual int handle_msg(client_id_t cid, basic::ByteBuffer &buffer) {
-        if (os::Time::now() - last_time > 3000) {
-            start_time = os::Time::now();
-            last_time = start_time;
-            recv_size = 0;
-        }
-        
-        recv_size += buffer.data_size();
-        if (os::Time::now() - last_time > 2000) {
-            LOG_TRACE("recv bytes: %ld bytes, recv_speed: %lf bytes/ms", recv_size, (double)recv_size / (os::Time::now() - start_time));
-            last_time = os::Time::now();
-        }
+    virtual int handle_msg(client_id_t cid, ptl::HttpPtl &http_ptl) {
+        ByteBuffer buffer;
+        ptl_.generate(buffer);
+        os::Time time_x;
+        ptl_.set_header_option("ResponseTime", time_x.format());
+        ptl_.set_header_option("SendStartTime", http_ptl.get_header_option("SendStartTime"));
+        this->send_data(cid, buffer);
 
-        send_data(cid, buffer);
         return 0;
     }
 
@@ -35,8 +34,9 @@ public:
 
 private:
     uint64_t recv_size = 0;
-    os::mtime_t start_time;
-    os::mtime_t last_time;
+    ptl::HttpPtl ptl_;
+    ByteBuffer request_buffer;
+    ByteBuffer response_buffer;
 };
 
 int main(int argc, char **argv)

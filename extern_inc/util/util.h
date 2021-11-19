@@ -15,11 +15,14 @@ enum TimerEventAttr {
     TimerEventAttr_ReAdd, // 定时器到期后重新添加
 };
 
+#define INVAILD_TIMER_ID    0
+typedef uint32_t timer_id_t;
+
 typedef void* (*TimeEvent_callback_t)(void*);
 typedef struct TimerEvent {
     friend class Timer;
 private:
-    uint32_t id; // 添加到定时器中时会返回一个ID
+    timer_id_t id; // 添加到定时器中时会返回一个ID
     os::mtime_t expire_time; // 定时器触发的时间，不能小于当前时间
 
 public:
@@ -41,7 +44,7 @@ public:
     }
 
     TimerEvent(void)
-    :id(0),
+    :id(INVAILD_TIMER_ID),
     expire_time(0),
     wait_time(0),
     attr(TimerEventAttr_Exit),
@@ -63,9 +66,9 @@ public:
     ~Timer(void);
 
     // 添加定时器,错误返回-1， 成功返回一个定时器id
-    int add(TimerEvent_t &event);
+    timer_id_t add(TimerEvent_t &event);
     // 根据定时器ID，取消定时器
-    int cancel(int id);
+    int cancel(timer_id_t id);
 
 private:
     virtual int run_handler(void);
@@ -80,7 +83,7 @@ private:
 
     os::Mutex mutex_;
     ds::MinHeap<TimerEvent_t> timer_heap_;
-    std::set<uint32_t> ids_;
+    std::set<timer_id_t> ids_;
 };
 
 /////////////////////////// 消息对象 ////////////////////////////////////////////////
@@ -97,6 +100,12 @@ private:
 enum MsgType {
     MsgType_Text = 1,
     MsgType_Binary = 2
+};
+
+enum MsgObjectState {
+    MsgObjectState_Running,
+    MsgObjectState_WaitExit,
+    MsgObjectState_Exit
 };
 
 typedef struct MsgBuffer_Info {
@@ -161,7 +170,7 @@ private:
     // 开启消息处理
     static int start(void);
     // 停止消息处理
-    static void* stop(void* arg) {is_running = false; return nullptr;}
+    static void* stop(void* arg);
     // 生成新的对象id
     static obj_id_t next_id(void);
 
@@ -174,8 +183,8 @@ private:
     static void* message_forwarding_center(void *arg);
 
 private:
+    static MsgObjectState state_;
     static os::Mutex run_lock_; 
-    static bool is_running;
     static obj_id_t next_object_id_;
 
     // 注册的消息对象

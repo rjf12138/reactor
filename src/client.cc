@@ -85,10 +85,16 @@ NetClient::disconnect(void)
     return 0;
 }
 
-int 
+util::timer_id_t 
 NetClient::add_timer_task(util::TimerEvent_t &event)
 {
     return MsgHandleCenter::instance().add_timer(event);
+}
+
+int 
+NetClient::cancel_timer_task(util::timer_id_t tid)
+{
+    return MsgHandleCenter::instance().cancel_timer(tid);
 }
 
 NetConnectState 
@@ -255,7 +261,7 @@ HttpNetClient::~HttpNetClient(void)
 }
 
 int 
-HttpNetClient::connect(const std::string &url, const basic::ByteBuffer &content)
+HttpNetClient::connect(const std::string &url)
 {
     int ret = NetClient::connect(url);
     if (ret < 0) {
@@ -268,11 +274,7 @@ HttpNetClient::connect(const std::string &url, const basic::ByteBuffer &content)
         return -1;
     }
 
-    http_ptl_.set_request(HTTP_METHOD_GET, url_parser_.res_path_);
-    http_ptl_.set_header_option(HTTP_HEADER_ContentLength, std::to_string(content.data_size()));
-    http_ptl_.set_content(content);
-
-    return send_data(http_ptl_);
+    return 0;
 }
 
 int 

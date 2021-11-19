@@ -52,6 +52,18 @@ NetServer::stop(void)
     return 0;
 }
 
+util::timer_id_t 
+NetServer::add_timer_task(util::TimerEvent_t &event)
+{
+    return MsgHandleCenter::instance().add_timer(event);
+}
+
+int 
+NetServer::cancel_timer_task(util::timer_id_t tid)
+{
+    return MsgHandleCenter::instance().cancel_timer(tid);
+}
+
 int 
 NetServer::close_client(client_id_t cid)
 {

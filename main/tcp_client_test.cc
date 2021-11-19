@@ -21,8 +21,8 @@ public:
             return 0;
         }
 
-        if (http_ptl.get_url() != "/Response") {
-            LOG_GLOBAL_WARN("Recv msg[ptl url: %s, TestClient url: /Response]", http_ptl.get_url().c_str());
+        if (http_ptl.get_status_code() != HTTP_STATUS_OK) {
+            LOG_GLOBAL_WARN("Recv msg[ptl url: %d, TestClient Status code: 200]", http_ptl.get_status_code());
             return 0;
         }
 
@@ -31,6 +31,8 @@ public:
             return 0;
         }
         LOG_GLOBAL_INFO("Successfully receive server response[%ld]", os::Time::now());
+
+        return 0;
     }
 
     int notify_client_disconnected(client_id_t cid) {
@@ -45,7 +47,11 @@ public:
         }
 
         TestClient* client_ptr = static_cast<TestClient*>(arg);
+        os::Time time_x;
+        client_ptr->ptl.set_header_option("SendStartTime", time_x.format());
         client_ptr->send_data(client_ptr->ptl);
+
+        return nullptr;
     }
 private:
     uint64_t recv_size = 0;
@@ -60,9 +66,9 @@ private:
 int main(int argc, char **argv)
 {
     TestClient client;
-    client.connect("tcp://192.168.0.103:12138");
+    client.connect("http://192.168.0.103:12138");
 
-    uint32_t send_gap = 2; // 单位：ms
+    uint32_t send_gap = 50; // 单位：ms
     uint64_t send_size = 400;
     uint64_t send_counts = 10000;
     std::string str;
@@ -76,7 +82,13 @@ int main(int argc, char **argv)
         if (ch == 'q') {
             break;
         } else if (ch == 's') {
-            
+            util::TimerEvent_t event;
+            event.attr = util::TimerEventAttr_ReAdd;
+            event.wait_time = send_gap;
+            event.TimeEvent_callback = TestClient::send_timer_task;
+            event.TimeEvent_arg = &client;
+
+            client.add_timer_task(event);
         }
     }
 
