@@ -4,7 +4,7 @@
 namespace reactor {
 
 NetClient::NetClient(void)
-:state_(NetConnectState_Dissconnected)
+:state_(NetConnectState_Disconnected)
 {
     sid_ = reinterpret_cast<server_id_t>(this);
 }
@@ -17,7 +17,7 @@ NetClient::~NetClient(void)
 int 
 NetClient::connect(const std::string &url)
 {
-    if (state_ != NetConnectState_Dissconnected) {
+    if (state_ != NetConnectState_Disconnected) {
         LOG_WARN("Client already connect other server[%s: %d]", url_parser_.addr_.c_str(), url_parser_.port_);
         return -1;
     }
@@ -76,8 +76,8 @@ NetClient::connect(const std::string &url)
 int 
 NetClient::disconnect(void)
 {
-    if (state_ != NetConnectState_Dissconnected) {
-        state_ = NetConnectState_Dissconnected;
+    if (state_ != NetConnectState_Disconnected) {
+        state_ = NetConnectState_Disconnected;
         client_conn_ptr_ = nullptr;
         return SubReactor::instance().remove_client_conn(sid_, cid_);
     }
@@ -103,11 +103,21 @@ NetClient::get_state(void)
     return state_;
 }
 
+std::string 
+NetClient::get_ip_info(void) 
+{
+    if (state_ == NetConnectState_Disconnected) {
+        LOG_WARN("Client not connect any server.");
+        return "";
+    }
+    return client_conn_ptr_->socket_ptr->get_ip_info();
+}
+
 void 
 NetClient::set_state(NetConnectState state)
 {
     state_ = state;
-    if (state == NetConnectState_Dissconnected) {
+    if (state == NetConnectState_Disconnected) {
         client_conn_ptr_ = nullptr;
     }
 }
@@ -115,7 +125,7 @@ NetClient::set_state(NetConnectState state)
 ssize_t 
 NetClient::send_data(const ByteBuffer &buff)
 {
-    if (state_ == NetConnectState_Dissconnected) {
+    if (state_ == NetConnectState_Disconnected) {
         LOG_WARN("Client not connect any server.");
         return -1;
     }
@@ -157,6 +167,10 @@ NetClient::client_func(void* arg)
 
     int size = 0;
     NetClient *client_ptr = (NetClient*)arg;
+    if (client_ptr->get_state() != NetConnectState_Connected) {
+        return nullptr;
+    }
+
     ByteBuffer &buffer = client_ptr->client_conn_ptr_->recv_buffer;
     os::SocketTCP *socket_ptr = client_ptr->client_conn_ptr_->socket_ptr;
     if (client_ptr->client_conn_ptr_ == nullptr) {

@@ -10,16 +10,16 @@ public:
         response_buffer.write_string("Response: Hello, world!!!!");
 
         ptl.set_request(HTTP_METHOD_GET, "/Request"); // 服务端返回是 /Response
-        ptl.set_header_option(HTTP_HEADER_Host, get_ip_info());
+        // ptl.set_header_option(HTTP_HEADER_Host, get_ip_info());
         ptl.set_content(request_buffer);
     }
     ~TestClient(void) {}
 
     int handle_msg(ptl::HttpPtl &http_ptl) {
-        if (http_ptl.get_header_option(HTTP_HEADER_Host) != get_ip_info()) {
-            LOG_GLOBAL_WARN("Recv msg[ptl Host: %s, TestClient Host: %s]", http_ptl.get_header_option(HTTP_HEADER_Host).c_str(), get_ip_info().c_str());
-            return 0;
-        }
+        // if (http_ptl.get_header_option(HTTP_HEADER_Host) != get_ip_info()) {
+        //     LOG_GLOBAL_WARN("Recv msg[ptl Host: %s, TestClient Host: %s]", http_ptl.get_header_option(HTTP_HEADER_Host).c_str(), get_ip_info().c_str());
+        //     return 0;
+        // }
 
         if (http_ptl.get_status_code() != HTTP_STATUS_OK) {
             LOG_GLOBAL_WARN("Recv msg[ptl url: %d, TestClient Status code: 200]", http_ptl.get_status_code());
@@ -54,10 +54,6 @@ public:
         return nullptr;
     }
 private:
-    uint64_t recv_size = 0;
-    uint64_t send_size = 0;
-    os::mtime_t send_gap = 500; // 单位: ms
-
     ptl::HttpPtl ptl;
     ByteBuffer request_buffer;
     ByteBuffer response_buffer;
@@ -68,7 +64,7 @@ int main(int argc, char **argv)
     TestClient client;
     client.connect("http://192.168.0.103:12138");
 
-    uint32_t send_gap = 50; // 单位：ms
+    uint32_t send_gap = 500; // 单位：ms
     uint64_t send_size = 400;
     uint64_t send_counts = 10000;
     std::string str;

@@ -6,7 +6,7 @@ namespace reactor {
 NetServer::NetServer(void)
 {
     id_ = reinterpret_cast<server_id_t>(this);
-    state_ = NetConnectState_Dissconnected;
+    state_ = NetConnectState_Disconnected;
 }
 
 NetServer::~NetServer(void)
@@ -36,9 +36,11 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
             handle_.client_func = client_func;
             handle_.client_conn_func = client_conn_func;
 
-            state_ = NetConnectState_Listening;
-
-            return MainReactor::instance().add_server_accept(&handle_);
+            int ret = MainReactor::instance().add_server_accept(&handle_);
+            if (ret >= 0) {
+                state_ = NetConnectState_Listening;
+                return ret;
+            }
     }
     return -1;
 }
@@ -47,6 +49,7 @@ int
 NetServer::stop(void)
 {
     if (state_ == NetConnectState_Listening) {
+        state_ = NetConnectState_Disconnected;
         return MainReactor::instance().remove_server_accept(id_);
     }
     return 0;
@@ -62,6 +65,16 @@ int
 NetServer::cancel_timer_task(util::timer_id_t tid)
 {
     return MsgHandleCenter::instance().cancel_timer(tid);
+}
+
+std::string 
+NetServer::get_ip_info(void)
+{
+    if (state_ != NetConnectState_Listening) {
+        LOG_WARN("Server not start listening!");
+        return "";
+    }
+    return server_.get_ip_info();
 }
 
 int 
@@ -203,7 +216,6 @@ NetServer::client_func(void* arg)
             server_ptr->close_client(id);
         }
     }
-    
     return nullptr;
 }
 

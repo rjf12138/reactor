@@ -56,6 +56,7 @@ MsgHandleCenter::MsgHandleCenter(void)
 
 MsgHandleCenter::~MsgHandleCenter(void)
 {
+    LOG_GLOBAL_INFO("~MsgHandleCenter Stop.");
 }
 
 int 
@@ -195,7 +196,8 @@ SendDataCenter::exit_loop(void* arg)
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
     sender_ptr->state_ == ReactorState_WaitExit;
     // 等待当前执行的任务退出
-    while (sender_ptr->state_ != ReactorState_Exit) {
+    while (sender_ptr->state_ == ReactorState_WaitExit) {
+        LOG_GLOBAL_INFO("Waiting for SendDataCenter exit!");
         os::Time::sleep(100);
     }
 
@@ -357,7 +359,7 @@ SubReactor::remove_client_conn(server_id_t sid, client_id_t cid)
     
     if (handle_ptr->acceptor == nullptr) { // 客户端acceptor 是nullptr
         NetClient* connect_ptr = reinterpret_cast<NetClient*>(handle_ptr->server_id);
-        connect_ptr->set_state(NetConnectState_Dissconnected);
+        connect_ptr->set_state(NetConnectState_Disconnected);
         connect_ptr->notify_client_disconnected(cid);
     } else {
         NetServer* connect_ptr = reinterpret_cast<NetServer*>(handle_ptr->server_id);
@@ -435,7 +437,8 @@ SubReactor::event_exit(void *arg)
     SubReactor *epoll_ptr = (SubReactor*)arg;
     epoll_ptr->state_ == ReactorState_WaitExit;
     // 等待当前执行的任务退出
-    while (epoll_ptr->state_ != ReactorState_Exit) {
+    while (epoll_ptr->state_ == ReactorState_WaitExit) {
+        LOG_GLOBAL_INFO("Waiting SubReactor exit!");
         os::Time::sleep(100);
     }
     return nullptr;
@@ -627,7 +630,8 @@ MainReactor::event_exit(void *arg)
     MainReactor *epoll_ptr = (MainReactor*)arg;
     epoll_ptr->state_ = ReactorState_WaitExit;
     // 等待当前执行的任务退出
-    while (epoll_ptr->state_ != ReactorState_Exit) {
+    while (epoll_ptr->state_ == ReactorState_WaitExit) {
+        LOG_GLOBAL_INFO("Waiting MainReactor exit!");
         os::Time::sleep(100);
     }
     return nullptr;

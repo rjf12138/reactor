@@ -12,7 +12,7 @@
 namespace reactor {
 ///////////////////////// 客户端类 /////////////////////////
 enum NetConnectState {
-    NetConnectState_Dissconnected,
+    NetConnectState_Disconnected,
     NetConnectState_UpgradePtl,
     NetConnectState_Connected,
     NetConnectState_Listening,
@@ -34,7 +34,7 @@ public:
     int cancel_timer_task(util::timer_id_t tid);
 
     // 获取IP信息
-    std::string get_ip_info(void) {return client_conn_ptr_->socket_ptr->get_ip_info();}
+    std::string get_ip_info(void);
     // 获取客户端当前状态
     NetConnectState get_state(void);
     // 设置客户端当前状态
@@ -140,7 +140,7 @@ public:
     int cancel_timer_task(util::timer_id_t tid);
 
     // 获取IP信息
-    std::string get_ip_info(void) {return server_.get_ip_info();}
+    std::string get_ip_info(void);
     // 关闭客户端连接, 参数 cid 可以从 handle_client_conn 中获取
     int close_client(client_id_t cid);
     // 发送数据给客户端

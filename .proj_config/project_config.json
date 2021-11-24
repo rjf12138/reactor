@@ -44,7 +44,7 @@
 			
 		]
 	},
-	"MainFileName": "tcp_client_test.cc",
+	"MainFileName": "tcp_server_test.cc",
 	"Name": "reactor",
 	"Path": "/home/ruanjian/workspace/project_v/reactor",
 	"ProgramRunArgs": "",

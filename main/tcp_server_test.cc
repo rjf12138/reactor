@@ -9,7 +9,7 @@ public:
         response_buffer.write_string("Response: Hello, world!!!!");
 
         ptl_.set_response(HTTP_STATUS_OK, "OK");
-        ptl_.set_header_option(HTTP_HEADER_Host, get_ip_info());
+        // ptl_.set_header_option(HTTP_HEADER_Host, get_ip_info());
         ptl_.set_content(response_buffer);
     }
 
@@ -42,7 +42,7 @@ private:
 int main(int argc, char **argv)
 {
     TestServer server;
-    server.start("192.168.0.103", 12138, ptl::ProtocolType_Tcp);
+    server.start("192.168.0.103", 12138, ptl::ProtocolType_Http);
 
     while (true) {
         char ch = getchar();
