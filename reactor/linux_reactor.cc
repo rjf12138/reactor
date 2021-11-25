@@ -38,29 +38,69 @@ epoll_events_to_std(uint32_t events)
     return std_events;
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-MsgHandleCenter& 
-MsgHandleCenter::instance(void)
+ReactorManager& 
+ReactorManager::instance(void)
 {
-    static MsgHandleCenter s_msg_handle_center;
+    static ReactorManager s_msg_handle_center;
     return s_msg_handle_center;
 }
 
-MsgHandleCenter::MsgHandleCenter(void)
+ReactorManager::ReactorManager(void)
+: send_datacenter_ptr(nullptr),
+ main_reactor_ptr(nullptr),
+ sub_reactor_ptr(nullptr)
 {
     //thread_pool_.show_threadpool_info();
-    ReactorConfig rconfig;
-    rconfig.threads_num = 5;
-    rconfig.max_wait_task = 1000;
-    this->set_config(rconfig);
-}
-
-MsgHandleCenter::~MsgHandleCenter(void)
-{
-    LOG_GLOBAL_INFO("~MsgHandleCenter Stop.");
 }
 
 int 
-MsgHandleCenter::set_config(const ReactorConfig_t &config)
+ReactorManager::start(void)
+{
+    ReactorConfig rconfig;
+    rconfig.threads_num = 5;
+    rconfig.max_wait_task = 1000;
+    this->start(rconfig);
+
+    return 0;
+}
+
+int 
+ReactorManager::start(const ReactorConfig_t &config)
+{
+    this->set_config(config);
+
+    send_datacenter_ptr = new SendDataCenter();
+    main_reactor_ptr = new MainReactor();
+    sub_reactor_ptr = new SubReactor();
+
+    return 0;
+}
+int 
+ReactorManager::stop(void)
+{
+    if (sub_reactor_ptr != nullptr) {
+        delete sub_reactor_ptr;
+        sub_reactor_ptr = nullptr;
+    }
+
+    if (main_reactor_ptr != nullptr) {
+        delete main_reactor_ptr;
+        main_reactor_ptr = nullptr;
+    }
+
+    if (send_datacenter_ptr != nullptr) {
+        delete send_datacenter_ptr;
+        send_datacenter_ptr = nullptr;
+    }
+}
+
+ReactorManager::~ReactorManager(void)
+{
+    LOG_GLOBAL_INFO("~ReactorManager Stop.");
+}
+
+int 
+ReactorManager::set_config(const ReactorConfig_t &config)
 {
     if (config.threads_num < 5) {
         LOG_GLOBAL_WARN("The reactor requires at least 5 threads![Input: %d]", config.threads_num);
@@ -75,31 +115,24 @@ MsgHandleCenter::set_config(const ReactorConfig_t &config)
 }
 
 int 
-MsgHandleCenter::add_task(os::Task &task)
+ReactorManager::add_task(os::Task &task)
 {
     return thread_pool_.add_task(task);
 }
 
 int 
-MsgHandleCenter::add_timer(util::TimerEvent_t event)
+ReactorManager::add_timer(util::TimerEvent_t event)
 {
     return timer_.add(event);
 }
 
 int 
-MsgHandleCenter::cancel_timer(int timer_id)
+ReactorManager::cancel_timer(int timer_id)
 {
     return timer_.cancel(timer_id);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-SendDataCenter& 
-SendDataCenter::instance(void)
-{
-    static SendDataCenter send_data_center_;
-    return send_data_center_;
-}
-
 SendDataCenter::SendDataCenter(void)
 :state_(ReactorState_Exit)
 {
@@ -109,7 +142,7 @@ SendDataCenter::SendDataCenter(void)
     task.exit_task = exit_loop;
     task.exit_arg = this;
 
-    MsgHandleCenter::instance().add_task(task);
+    ReactorManager::instance().add_task(task);
 }
 
 SendDataCenter::~SendDataCenter(void)
@@ -205,13 +238,6 @@ SendDataCenter::exit_loop(void* arg)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-SubReactor& 
-SubReactor::instance(void)
-{
-    static SubReactor s_sub_reactor_;
-    return s_sub_reactor_;
-}
-
 SubReactor::SubReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
   timeout_(timeout),
@@ -232,12 +258,26 @@ SubReactor::SubReactor(int events_max_size, int timeout)
         task.thread_arg = this;
         task.exit_arg = this;
 
-        MsgHandleCenter::instance().add_task(task);
+        ReactorManager::instance().add_task(task);
     }
 }
 
 SubReactor::~SubReactor(void)
 {
+    std::set<std::pair<server_id_t, client_id_t>> scids;
+    for (auto iter = servers_.begin(); iter != servers_.end(); ++iter) {
+        std::pair<server_id_t, client_id_t> scid;
+        for (auto citer = iter->second->client_conn.begin(); citer != iter->second->client_conn.end(); ++citer) {
+            scid.first = iter->first;
+            scid.second = citer->first;
+            scids.insert(scid);
+        }
+    }
+
+    for (auto iter = scids.begin(); iter != scids.end(); ++iter) {
+        remove_client_conn(iter->first, iter->second);
+    }
+
     if (events_ != nullptr) {
         delete []events_;
         events_ = nullptr;
@@ -318,7 +358,7 @@ SubReactor::add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr)
     client_conn_to_[client_conn_ptr->socket_ptr->get_socket()] = handle_ptr->server_id;
     handle_ptr->client_conn_mutex.unlock();
 
-    SendDataCenter::instance().register_connection(client_conn_ptr);
+    ReactorManager::instance().get_send_datacenter()->register_connection(client_conn_ptr);
 
     return 0;
 }
@@ -415,7 +455,7 @@ SubReactor::event_wait(void *arg)
                     task.work_func = handle_ptr->client_func;
                     task.thread_arg = handle_ptr->client_arg;
 
-                    MsgHandleCenter::instance().add_task(task);
+                    ReactorManager::instance().add_task(task);
                 }
                 handle_ptr->ready_sock_mutex.unlock();
             }
@@ -435,23 +475,16 @@ SubReactor::event_exit(void *arg)
     }
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
-    epoll_ptr->state_ == ReactorState_WaitExit;
+    epoll_ptr->state_ = ReactorState_WaitExit;
     // 等待当前执行的任务退出
     while (epoll_ptr->state_ == ReactorState_WaitExit) {
         LOG_GLOBAL_INFO("Waiting SubReactor exit!");
-        os::Time::sleep(100);
+        os::Time::sleep(500);
     }
     return nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-MainReactor& 
-MainReactor::instance(void)
-{
-    static MainReactor s_main_reactor_;
-    return s_main_reactor_;
-}
-
 MainReactor::MainReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
   timeout_(timeout),
@@ -473,11 +506,19 @@ MainReactor::MainReactor(int events_max_size, int timeout)
     task.thread_arg = this;
     task.exit_arg = this;
 
-    MsgHandleCenter::instance().add_task(task);
+    ReactorManager::instance().add_task(task);
 }
 
 MainReactor::~MainReactor(void)
 {
+    std::set<server_id_t> sids;
+    for (auto iter = acceptor_.begin(); iter != acceptor_.end(); ++iter) {
+        sids.insert(iter->first);
+    }
+    for (auto iter = sids.begin(); iter != sids.end(); ++iter) {
+        remove_server_accept(*iter);
+    }
+
     if (events_ != nullptr) {
         delete []events_;
         events_ = nullptr;
@@ -527,7 +568,7 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
     server_ctl_mutex_.lock();
     server_listen_to_[handle_ptr->acceptor->get_socket()] = handle_ptr->server_id;
     acceptor_[handle_ptr->server_id] = handle_ptr;
-    SubReactor::instance().server_register(handle_ptr);
+    ReactorManager::instance().get_sub_reactor()->server_register(handle_ptr);
     server_ctl_mutex_.unlock();
 
     return 0;
@@ -551,9 +592,20 @@ MainReactor::remove_server_accept(server_id_t sid)
     auto end_iter = accept_iter->second->client_conn.end();
     for (; iter != end_iter; ) {
         auto stop_iter = iter++;
-        SubReactor::instance().remove_client_conn(sid, stop_iter->first);
+        ReactorManager::instance().get_sub_reactor()->remove_client_conn(sid, stop_iter->first);
+    }
+
+    int listen_sock = accept_iter->second->acceptor->get_socket();
+    auto listen_sock_iter = server_listen_to_.find(listen_sock);
+    if (listen_sock_iter != server_listen_to_.end()) {
+        server_listen_to_.erase(listen_sock_iter);
     }
     accept_iter->second->acceptor->close();
+
+    NetServer* connect_ptr = reinterpret_cast<NetServer*>(accept_iter->second->server_id);
+    connect_ptr->set_state(NetConnectState_Disconnected);
+    connect_ptr->notify_server_stop_listen();
+
     acceptor_.erase(accept_iter);
     server_ctl_mutex_.unlock();
 
@@ -563,7 +615,7 @@ MainReactor::remove_server_accept(server_id_t sid)
 int 
 MainReactor::remove_client_conn(server_id_t sid, client_id_t cid)
 {
-    return SubReactor::instance().remove_client_conn(sid, cid);
+    return ReactorManager::instance().get_sub_reactor()->remove_client_conn(sid, cid);
 }
 
 void* 
@@ -601,7 +653,7 @@ MainReactor::event_wait(void *arg)
                 client_conn_ptr->client_id = client_sock_fd;
                 client_conn_ptr->socket_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
                 client_conn_ptr->socket_ptr->setnonblocking();
-                int ret = SubReactor::instance().add_client_conn(handle_ptr->server_id, client_conn_ptr);
+                int ret = ReactorManager::instance().get_sub_reactor()->add_client_conn(handle_ptr->server_id, client_conn_ptr);
                 if (ret < 0) {
                     client_conn_ptr->socket_ptr->close();
                     delete client_conn_ptr;
@@ -632,7 +684,7 @@ MainReactor::event_exit(void *arg)
     // 等待当前执行的任务退出
     while (epoll_ptr->state_ == ReactorState_WaitExit) {
         LOG_GLOBAL_INFO("Waiting MainReactor exit!");
-        os::Time::sleep(100);
+        os::Time::sleep(500);
     }
     return nullptr;
 }

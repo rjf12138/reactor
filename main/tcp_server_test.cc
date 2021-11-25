@@ -32,6 +32,11 @@ public:
         return 0;
     }
 
+    int notify_server_stop_listen(void) {
+        LOG_TRACE("server stop listen!");
+        return 0;
+    }
+
 private:
     uint64_t recv_size = 0;
     ptl::HttpPtl ptl_;
@@ -41,6 +46,7 @@ private:
 
 int main(int argc, char **argv)
 {
+    
     TestServer server;
     server.start("192.168.0.103", 12138, ptl::ProtocolType_Http);
 

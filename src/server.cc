@@ -36,7 +36,7 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
             handle_.client_func = client_func;
             handle_.client_conn_func = client_conn_func;
 
-            int ret = MainReactor::instance().add_server_accept(&handle_);
+            int ret = ReactorManager::instance().get_main_reactor()->add_server_accept(&handle_);
             if (ret >= 0) {
                 state_ = NetConnectState_Listening;
                 return ret;
@@ -50,7 +50,7 @@ NetServer::stop(void)
 {
     if (state_ == NetConnectState_Listening) {
         state_ = NetConnectState_Disconnected;
-        return MainReactor::instance().remove_server_accept(id_);
+        return ReactorManager::instance().get_main_reactor()->remove_server_accept(id_);
     }
     return 0;
 }
@@ -58,13 +58,21 @@ NetServer::stop(void)
 util::timer_id_t 
 NetServer::add_timer_task(util::TimerEvent_t &event)
 {
-    return MsgHandleCenter::instance().add_timer(event);
+    if (state_ != NetConnectState_Listening) {
+        LOG_WARN("Server not start listening!");
+        return INVAILD_TIMER_ID;
+    }
+    return ReactorManager::instance().add_timer(event);
 }
 
 int 
 NetServer::cancel_timer_task(util::timer_id_t tid)
 {
-    return MsgHandleCenter::instance().cancel_timer(tid);
+    if (state_ != NetConnectState_Listening) {
+        LOG_WARN("Server not start listening!");
+        return INVAILD_TIMER_ID;
+    }
+    return ReactorManager::instance().cancel_timer(tid);
 }
 
 std::string 
@@ -84,7 +92,7 @@ NetServer::close_client(client_id_t cid)
         LOG_WARN("Server not start listening!");
         return -1;
     }
-    return MainReactor::instance().remove_client_conn(id_, cid);
+    return ReactorManager::instance().get_main_reactor()->remove_client_conn(id_, cid);
 }
 
 ssize_t 
@@ -100,7 +108,7 @@ NetServer::send_data(client_id_t id, const ByteBuffer &buff)
     client_conn_ptr->send_buffer += buff;
     client_conn_ptr->buff_mutex.unlock();
 
-    SendDataCenter::instance().send_data(client_conn_ptr->client_id);
+    ReactorManager::instance().get_send_datacenter()->send_data(client_conn_ptr->client_id);
 
     return buff.data_size();
 }
@@ -143,6 +151,13 @@ int
 NetServer::notify_client_disconnected(client_id_t cid)
 {
     // 如果在客户端连接断开时需要处理一些事务，可以重载这个函数
+    return 0;
+}
+
+int 
+NetServer::notify_server_stop_listen(void)
+{
+    // 服务器停止监听
     return 0;
 }
 

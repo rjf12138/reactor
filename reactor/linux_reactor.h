@@ -5,7 +5,7 @@
 
 /********************************************************
 * 线程数分配（至少5个线程）：
-* 实时打印线程信息： 取决于 MsgHandleCenter 是否开启
+* 实时打印线程信息： 取决于 ReactorManager 是否开启
 * SubReactor： 一个线程
 * MainReactor: 一个线程
 * SendDataCenter： 至少一个线程
@@ -19,37 +19,10 @@ enum ReactorState {
     ReactorState_Exit
 };
 
-class MsgHandleCenter {
-public:
-    static MsgHandleCenter& instance(void);
-    virtual ~MsgHandleCenter(void);
-
-    // 设置线程池配置
-    int set_config(const ReactorConfig_t &config);
-    // 添加线程任务
-    int add_task(os::Task &task);
-
-    // 添加定时任务
-    int add_timer(util::TimerEvent_t event);
-    // 取消定时任务
-    int cancel_timer(int timer_id);
-
-private:
-    MsgHandleCenter(void);
-    MsgHandleCenter(const MsgHandleCenter&) = delete;
-    MsgHandleCenter& operator=(const MsgHandleCenter&) = delete;
-
-private:
-    ReactorConfig_t config_;
-    os::ThreadPool thread_pool_;
-
-    util::Timer timer_;   
-};
-
 ///////////////////////////// 发送数据处理 ////////////////////////////////////////////
 class SendDataCenter {
 public:
-    static SendDataCenter& instance(void);
+    SendDataCenter(void);
     virtual ~SendDataCenter(void);
 
     // 向对端发送数据
@@ -62,7 +35,6 @@ public:
     ReactorState state(void) const {return state_;}
 
 private:
-    SendDataCenter(void);
     SendDataCenter(const SendDataCenter&) = delete;
     SendDataCenter& operator=(const SendDataCenter&) = delete;
 
@@ -70,8 +42,6 @@ private:
     static void* exit_loop(void* arg);
 
 private:
-    static SendDataCenter *send_center_;
-    
     ReactorState state_;
 
     os::Mutex send_mtx_;
@@ -84,7 +54,7 @@ private:
 //////////////////////////// 处理客户端的数据 ////////////////////////////////////////////
 class SubReactor : public Logger {
 public:
-    static SubReactor& instance(void);
+    SubReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~SubReactor(void);
 
     // 获取状态
@@ -104,7 +74,6 @@ public:
 private:
     inline EventHandle_t* get_event_handle(int client_sock);
 
-    SubReactor(int events_max_size_ = 32, int timeout = 3000);
     SubReactor(const SubReactor &) = delete;
     SubReactor& operator=(const SubReactor&) = delete;
 
@@ -123,7 +92,7 @@ private:
 /////////////////////////// 处理客户端的连接 ///////////////////////////////////////////
 class MainReactor : public Logger {
 public:
-    static MainReactor& instance(void);
+    MainReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~MainReactor(void);
 
     // 获取状态
@@ -141,7 +110,6 @@ public:
     static void* event_exit(void *arg);
 
 private:
-    MainReactor(int events_max_size_ = 32, int timeout = 3000);
     MainReactor(const MainReactor &) = delete;
     MainReactor& operator=(const MainReactor&) = delete;
 
@@ -159,5 +127,48 @@ private:
     std::map<server_id_t, EventHandle_t*> acceptor_;
 };
 
+
+//////////////////////////// Reactor Manager //////////////////////////////////////////////////
+class ReactorManager {
+public:
+    static ReactorManager& instance(void);
+    virtual ~ReactorManager(void);
+
+    // 默认配置启动
+    int start(void);
+    // 启动Reactor
+    int start(const ReactorConfig_t &config);
+    // 停止Reactor
+    int stop(void);
+
+    MainReactor* get_main_reactor(void) {return main_reactor_ptr;}
+    SubReactor* get_sub_reactor(void) {return sub_reactor_ptr;}
+    SendDataCenter *get_send_datacenter(void) {return send_datacenter_ptr;}
+
+    // 设置线程池配置
+    int set_config(const ReactorConfig_t &config);
+    // 添加线程任务
+    int add_task(os::Task &task);
+
+    // 添加定时任务
+    int add_timer(util::TimerEvent_t event);
+    // 取消定时任务
+    int cancel_timer(int timer_id);
+
+private:
+    ReactorManager(void);
+    ReactorManager(const ReactorManager&) = delete;
+    ReactorManager& operator=(const ReactorManager&) = delete;
+
+private:
+    ReactorConfig_t config_;
+
+    os::ThreadPool thread_pool_;
+    util::Timer timer_;
+
+    MainReactor* main_reactor_ptr;
+    SubReactor* sub_reactor_ptr;
+    SendDataCenter *send_datacenter_ptr;
+};
 }
 #endif

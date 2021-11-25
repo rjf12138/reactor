@@ -52,7 +52,7 @@ NetClient::connect(const std::string &url)
     handle_.client_arg = this;
     handle_.client_func = client_func;
 
-    ret = SubReactor::instance().server_register(&handle_);
+    ret = ReactorManager::instance().get_sub_reactor()->server_register(&handle_);
     if (ret < 0) {
         LOG_WARN("Client register Failed[%s: %d]", url_parser_.addr_, url_parser_.port_);
         delete client_conn_ptr;
@@ -60,7 +60,7 @@ NetClient::connect(const std::string &url)
     }
 
     client_conn_ptr->socket_ptr->setnonblocking();
-    ret = SubReactor::instance().add_client_conn(sid_, client_conn_ptr);
+    ret = ReactorManager::instance().get_sub_reactor()->add_client_conn(sid_, client_conn_ptr);
     if (ret < 0) {
         LOG_WARN("Add client connection Failed[%s: %d]", url_parser_.addr_, url_parser_.port_);
         delete client_conn_ptr;
@@ -79,7 +79,7 @@ NetClient::disconnect(void)
     if (state_ != NetConnectState_Disconnected) {
         state_ = NetConnectState_Disconnected;
         client_conn_ptr_ = nullptr;
-        return SubReactor::instance().remove_client_conn(sid_, cid_);
+        return ReactorManager::instance().get_sub_reactor()->remove_client_conn(sid_, cid_);
     }
 
     return 0;
@@ -88,13 +88,13 @@ NetClient::disconnect(void)
 util::timer_id_t 
 NetClient::add_timer_task(util::TimerEvent_t &event)
 {
-    return MsgHandleCenter::instance().add_timer(event);
+    return ReactorManager::instance().add_timer(event);
 }
 
 int 
 NetClient::cancel_timer_task(util::timer_id_t tid)
 {
-    return MsgHandleCenter::instance().cancel_timer(tid);
+    return ReactorManager::instance().cancel_timer(tid);
 }
 
 NetConnectState 
@@ -135,7 +135,7 @@ NetClient::send_data(const ByteBuffer &buff)
     client_conn_ptr->send_buffer += buff;
     client_conn_ptr->buff_mutex.unlock();
 
-    SendDataCenter::instance().send_data(client_conn_ptr->client_id);
+    ReactorManager::instance().get_send_datacenter()->send_data(client_conn_ptr->client_id);
 
     return buff.data_size();
 }

@@ -139,6 +139,10 @@ public:
     // 取消定时任务
     int cancel_timer_task(util::timer_id_t tid);
 
+    // 设置服务器状态
+    void set_state(NetConnectState state) {state_ = state;}
+    // 获取服务器状态
+    NetConnectState get_state() const {return state_;}
     // 获取IP信息
     std::string get_ip_info(void);
     // 关闭客户端连接, 参数 cid 可以从 handle_client_conn 中获取
@@ -156,6 +160,8 @@ public:
     virtual int handle_client_conn(client_id_t cid);
     // 客户端连接断开时会调用
     virtual int notify_client_disconnected(client_id_t cid);
+    // 服务端停止监听时的回调
+    virtual int notify_server_stop_listen(void);
 
     // 进程内消息收到时回调函数
     virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
