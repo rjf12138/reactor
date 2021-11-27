@@ -54,17 +54,6 @@ ReactorManager::ReactorManager(void)
 }
 
 int 
-ReactorManager::start(void)
-{
-    ReactorConfig rconfig;
-    rconfig.threads_num = 5;
-    rconfig.max_wait_task = 1000;
-    this->start(rconfig);
-
-    return 0;
-}
-
-int 
 ReactorManager::start(const ReactorConfig_t &config)
 {
     this->set_config(config);
@@ -92,6 +81,8 @@ ReactorManager::stop(void)
         delete send_datacenter_ptr;
         send_datacenter_ptr = nullptr;
     }
+
+    return 0;
 }
 
 ReactorManager::~ReactorManager(void)

@@ -6,3 +6,4 @@
 
 TODO:
 1. Reactor开启和关闭
+2. Reactor关闭时程序死循环了

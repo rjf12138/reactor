@@ -134,8 +134,6 @@ public:
     static ReactorManager& instance(void);
     virtual ~ReactorManager(void);
 
-    // 默认配置启动
-    int start(void);
     // 启动Reactor
     int start(const ReactorConfig_t &config);
     // 停止Reactor

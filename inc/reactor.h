@@ -18,6 +18,9 @@ enum NetConnectState {
     NetConnectState_Listening,
 };
 
+extern int reactor_start(const ReactorConfig_t &config);
+extern int reactor_stop(void);
+
 class NetClient : public basic::Logger, public util::MsgObject {
 public:
     NetClient(void);

@@ -61,6 +61,12 @@ private:
 
 int main(int argc, char **argv)
 {
+    ReactorConfig_t rconfig;
+    rconfig.max_wait_task = 10000;
+    rconfig.threads_num = 5;
+    rconfig.send_thread_num = 1;
+    reactor_start(rconfig);
+
     TestClient client;
     client.connect("http://192.168.0.103:12138");
 
@@ -88,5 +94,6 @@ int main(int argc, char **argv)
         }
     }
 
+    reactor_stop();
     return 0;
 }
