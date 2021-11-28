@@ -24,7 +24,8 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
     
     if (server_.listen() >= 0 &&
         server_.setnonblocking() >= 0 &&
-        server_.set_reuse_addr() >= 0) {
+        server_.set_reuse_addr() >= 0 && 
+        ReactorManager::instance().get_main_reactor_state() == ReactorState_Running) {
             type_ = type;
             handle_.exit = false;
             handle_.server_id = id_;
@@ -41,6 +42,8 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
                 state_ = NetConnectState_Listening;
                 return ret;
             }
+    } else {
+        LOG_WARN("An Error occur when adding a server![MainReactor: %d]", ReactorManager::instance().get_main_reactor_state());
     }
     return -1;
 }
@@ -48,10 +51,10 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
 int 
 NetServer::stop(void)
 {
-    if (state_ == NetConnectState_Listening) {
-        state_ = NetConnectState_Disconnected;
+    if (state_ == NetConnectState_Listening && ReactorManager::instance().get_main_reactor_state() == ReactorState_Running) {
         return ReactorManager::instance().get_main_reactor()->remove_server_accept(id_);
     }
+    state_ = NetConnectState_Disconnected;
     return 0;
 }
 

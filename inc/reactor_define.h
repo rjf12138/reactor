@@ -92,9 +92,16 @@ typedef struct EventHandle {
 } EventHandle_t;
 
 typedef struct ReactorConfig {
+    bool is_start_server;
     uint32_t threads_num;
     uint32_t send_thread_num;
     uint32_t max_wait_task;
+
+    ReactorConfig()
+    :is_start_server(true),
+    threads_num(5),
+    send_thread_num(1),
+    max_wait_task(10000) {}
 } ReactorConfig_t;
 }
 

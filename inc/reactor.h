@@ -18,9 +18,11 @@ enum NetConnectState {
     NetConnectState_Listening,
 };
 
+////////////////////// 启动和终止函数 //////////////////////////////////////////////////
 extern int reactor_start(const ReactorConfig_t &config);
 extern int reactor_stop(void);
 
+//////////////////////////////////////////////////////////////////////////////////////
 class NetClient : public basic::Logger, public util::MsgObject {
 public:
     NetClient(void);

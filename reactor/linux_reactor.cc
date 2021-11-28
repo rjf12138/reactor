@@ -58,23 +58,52 @@ ReactorManager::start(const ReactorConfig_t &config)
 {
     this->set_config(config);
 
-    send_datacenter_ptr = new SendDataCenter();
-    main_reactor_ptr = new MainReactor();
-    sub_reactor_ptr = new SubReactor();
+    if (send_datacenter_ptr == nullptr) {
+        send_datacenter_ptr = new SendDataCenter();
+
+        while (get_send_datacenter_state() != ReactorState_Running) {
+            LOG_GLOBAL_INFO("Waiting send datacenter start!");
+            os::Time::sleep(200);
+        }
+    } else {
+        LOG_GLOBAL_INFO("send data center is already running!");
+    }
+
+    if (sub_reactor_ptr == nullptr) {
+        sub_reactor_ptr = new SubReactor();
+
+        while (get_sub_reactor_state() != ReactorState_Running) {
+            LOG_GLOBAL_INFO("Waiting sub reactor start!");
+            os::Time::sleep(200);
+        }
+    } else {
+        LOG_GLOBAL_INFO("sub reactor is already running!");
+    }
+
+    if (main_reactor_ptr == nullptr && config.is_start_server == true) {
+        main_reactor_ptr = new MainReactor();
+
+        while (get_main_reactor_state() != ReactorState_Running) {
+            LOG_GLOBAL_INFO("Waiting sub reactor start!");
+            os::Time::sleep(200);
+        }
+    } else {
+        LOG_GLOBAL_INFO("main reactor is already running or config start server is set false[%s]!", config.is_start_server ? "true":"false");
+    }
 
     return 0;
 }
 int 
 ReactorManager::stop(void)
 {
-    if (sub_reactor_ptr != nullptr) {
-        delete sub_reactor_ptr;
-        sub_reactor_ptr = nullptr;
-    }
-
     if (main_reactor_ptr != nullptr) {
         delete main_reactor_ptr;
         main_reactor_ptr = nullptr;
+    }
+
+    if (sub_reactor_ptr != nullptr) {
+        delete sub_reactor_ptr;
+        sub_reactor_ptr = nullptr;
     }
 
     if (send_datacenter_ptr != nullptr) {
@@ -125,19 +154,29 @@ ReactorManager::cancel_timer(int timer_id)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 SendDataCenter::SendDataCenter(void)
-:state_(ReactorState_Exit)
 {
+    ReactorManager::instance().set_send_datacenter_state(ReactorState_Exit);
+
     os::Task task;
     task.work_func = send_loop;
     task.thread_arg = this;
     task.exit_task = exit_loop;
     task.exit_arg = this;
-
     ReactorManager::instance().add_task(task);
 }
 
 SendDataCenter::~SendDataCenter(void)
 {
+    std::set<client_id_t> tmp;
+    for (auto iter = sender_conns_.begin(); iter != sender_conns_.end(); ++iter) {
+        tmp.insert(iter->first);
+    }
+
+    for (auto iter = tmp.begin(); iter != tmp.end(); ++iter) {
+        remove_connection(*iter);
+    }
+
+    exit_loop(this);
 }
 
 int 
@@ -182,8 +221,8 @@ SendDataCenter::send_loop(void* arg)
     }
 
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
-    sender_ptr->state_ = ReactorState_Running;
-    while (sender_ptr->state_ == ReactorState_Running) {
+    ReactorManager::instance().set_send_datacenter_state(ReactorState_Running);
+    while (ReactorManager::instance().get_send_datacenter_state() == ReactorState_Running) {
         if (sender_ptr->send_queue_.size() <= 0) {
             os::Time::sleep(5);
         }
@@ -206,7 +245,7 @@ SendDataCenter::send_loop(void* arg)
             iter->second->socket_ptr->send(iter->second->send_buffer);
         }
     }
-    sender_ptr->state_ = ReactorState_Exit;
+    ReactorManager::instance().set_send_datacenter_state(ReactorState_Exit);
     return nullptr;
 }
 
@@ -218,9 +257,9 @@ SendDataCenter::exit_loop(void* arg)
     }
 
     SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
-    sender_ptr->state_ == ReactorState_WaitExit;
+    ReactorManager::instance().set_send_datacenter_state(ReactorState_WaitExit);
     // 等待当前执行的任务退出
-    while (sender_ptr->state_ == ReactorState_WaitExit) {
+    while (ReactorManager::instance().get_send_datacenter_state() == ReactorState_WaitExit) {
         LOG_GLOBAL_INFO("Waiting for SendDataCenter exit!");
         os::Time::sleep(100);
     }
@@ -231,9 +270,9 @@ SendDataCenter::exit_loop(void* arg)
 //////////////////////////////////////////////////////////////////////////////////////////
 SubReactor::SubReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
-  timeout_(timeout),
-  state_(ReactorState_Exit)
+  timeout_(timeout)
 {
+    ReactorManager::instance().set_sub_reactor_state(ReactorState_Exit);
     if (events_max_size_ < 0) {
         events_max_size_ = 32;
     }
@@ -269,6 +308,7 @@ SubReactor::~SubReactor(void)
         remove_client_conn(iter->first, iter->second);
     }
 
+    event_exit(this);
     if (events_ != nullptr) {
         delete []events_;
         events_ = nullptr;
@@ -409,8 +449,8 @@ SubReactor::event_wait(void *arg)
     }
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
-    epoll_ptr->state_ = ReactorState_Running;
-    while (epoll_ptr->state_ == ReactorState_Running) {
+    ReactorManager::instance().set_sub_reactor_state(ReactorState_Running);
+    while (ReactorManager::instance().get_sub_reactor_state() == ReactorState_Running) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
         if (ret == -1 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
@@ -453,7 +493,7 @@ SubReactor::event_wait(void *arg)
         }
     }
     
-    epoll_ptr->state_ = ReactorState_Exit;
+    ReactorManager::instance().set_sub_reactor_state(ReactorState_Exit);;
     return nullptr;
 }
 
@@ -466,9 +506,9 @@ SubReactor::event_exit(void *arg)
     }
 
     SubReactor *epoll_ptr = (SubReactor*)arg;
-    epoll_ptr->state_ = ReactorState_WaitExit;
+    ReactorManager::instance().set_sub_reactor_state(ReactorState_WaitExit);
     // 等待当前执行的任务退出
-    while (epoll_ptr->state_ == ReactorState_WaitExit) {
+    while (ReactorManager::instance().get_sub_reactor_state() == ReactorState_WaitExit) {
         LOG_GLOBAL_INFO("Waiting SubReactor exit!");
         os::Time::sleep(500);
     }
@@ -478,9 +518,9 @@ SubReactor::event_exit(void *arg)
 ///////////////////////////////////////////////////////////////////////////////////////
 MainReactor::MainReactor(int events_max_size, int timeout)
 : events_max_size_(events_max_size),
-  timeout_(timeout),
-  state_(ReactorState_Exit)
+  timeout_(timeout)
 {
+    ReactorManager::instance().set_main_reactor_state(ReactorState_Exit);
     if (events_max_size_ <= 0) {
         events_max_size_ = 32;
     }
@@ -510,6 +550,7 @@ MainReactor::~MainReactor(void)
         remove_server_accept(*iter);
     }
 
+    event_exit(this);
     if (events_ != nullptr) {
         delete []events_;
         events_ = nullptr;
@@ -618,8 +659,8 @@ MainReactor::event_wait(void *arg)
     }
 
     MainReactor *epoll_ptr = (MainReactor*)arg;
-    epoll_ptr->state_ = ReactorState_Running;
-    while (epoll_ptr->state_ == ReactorState_Running) {
+    ReactorManager::instance().set_main_reactor_state(ReactorState_Running);
+    while (ReactorManager::instance().get_main_reactor_state() == ReactorState_Running) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
         if (ret < 0 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
@@ -658,7 +699,7 @@ MainReactor::event_wait(void *arg)
         }
     }
     
-    epoll_ptr->state_ = ReactorState_Exit;
+    ReactorManager::instance().set_main_reactor_state(ReactorState_Exit);
     return nullptr;
 }
 
@@ -671,9 +712,9 @@ MainReactor::event_exit(void *arg)
     }
 
     MainReactor *epoll_ptr = (MainReactor*)arg;
-    epoll_ptr->state_ = ReactorState_WaitExit;
+    ReactorManager::instance().set_main_reactor_state(ReactorState_WaitExit);
     // 等待当前执行的任务退出
-    while (epoll_ptr->state_ == ReactorState_WaitExit) {
+    while (ReactorManager::instance().get_main_reactor_state() == ReactorState_WaitExit) {
         LOG_GLOBAL_INFO("Waiting MainReactor exit!");
         os::Time::sleep(500);
     }

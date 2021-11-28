@@ -53,8 +53,8 @@ NetClient::connect(const std::string &url)
     handle_.client_func = client_func;
 
     ret = ReactorManager::instance().get_sub_reactor()->server_register(&handle_);
-    if (ret < 0) {
-        LOG_WARN("Client register Failed[%s: %d]", url_parser_.addr_, url_parser_.port_);
+    if (ret < 0 && ReactorManager::instance().get_sub_reactor_state() == ReactorState_Running) {
+        LOG_WARN("Client register Failed[%s: %d][subReactor: %d]", url_parser_.addr_, url_parser_.port_, ReactorManager::instance().get_sub_reactor_state());
         delete client_conn_ptr;
         return -1;
     }
@@ -76,11 +76,11 @@ NetClient::connect(const std::string &url)
 int 
 NetClient::disconnect(void)
 {
-    if (state_ != NetConnectState_Disconnected) {
-        state_ = NetConnectState_Disconnected;
+    if (state_ != NetConnectState_Disconnected && ReactorManager::instance().get_sub_reactor_state() == ReactorState_Running) {
         client_conn_ptr_ = nullptr;
         return ReactorManager::instance().get_sub_reactor()->remove_client_conn(sid_, cid_);
     }
+    state_ = NetConnectState_Disconnected;
 
     return 0;
 }

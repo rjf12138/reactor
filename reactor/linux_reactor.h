@@ -31,8 +31,6 @@ public:
     int register_connection(ClientConn_t *client_ptr);
     // 移除发送对象
     int remove_connection(client_id_t cid);
-    // 获取状态
-    ReactorState state(void) const {return state_;}
 
 private:
     SendDataCenter(const SendDataCenter&) = delete;
@@ -42,8 +40,6 @@ private:
     static void* exit_loop(void* arg);
 
 private:
-    ReactorState state_;
-
     os::Mutex send_mtx_;
     ds::Queue<client_id_t> send_queue_;
 
@@ -57,8 +53,6 @@ public:
     SubReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~SubReactor(void);
 
-    // 获取状态
-    ReactorState state(void) const {return state_;}
     // 注册服务
     int server_register(EventHandle_t *handle_ptr);
     // 添加新的客户端连接
@@ -78,8 +72,6 @@ private:
     SubReactor& operator=(const SubReactor&) = delete;
 
 private:
-    ReactorState state_;
-
     int epfd_;
     int timeout_;
     int events_max_size_;   // 一次最多返回的触发事件
@@ -95,8 +87,6 @@ public:
     MainReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~MainReactor(void);
 
-    // 获取状态
-    ReactorState state(void) const {return state_;}
     // 添加服务端监听连接
     int add_server_accept(EventHandle_t *handle_ptr);
     // 删除服务端监听连接
@@ -115,8 +105,6 @@ private:
 
     inline EventHandle_t* get_event_handle(int listen_socket_fd);
 private:
-    ReactorState state_;
-
     int epfd_;
     int timeout_;
     int events_max_size_;   // 一次最多返回的触发事件
@@ -143,6 +131,14 @@ public:
     SubReactor* get_sub_reactor(void) {return sub_reactor_ptr;}
     SendDataCenter *get_send_datacenter(void) {return send_datacenter_ptr;}
 
+    void set_main_reactor_state(ReactorState state) {main_reactor_state_ = state;}
+    void set_sub_reactor_state(ReactorState state) {sub_reactor_state_ = state;}
+    void set_send_datacenter_state(ReactorState state) {send_datacenter_state_ = state;}
+
+    ReactorState get_main_reactor_state(void) {return main_reactor_state_;}
+    ReactorState get_sub_reactor_state(void) {return sub_reactor_state_;}
+    ReactorState get_send_datacenter_state(void) {return send_datacenter_state_;}
+
     // 设置线程池配置
     int set_config(const ReactorConfig_t &config);
     // 添加线程任务
@@ -167,6 +163,10 @@ private:
     MainReactor* main_reactor_ptr;
     SubReactor* sub_reactor_ptr;
     SendDataCenter *send_datacenter_ptr;
+
+    ReactorState main_reactor_state_;
+    ReactorState sub_reactor_state_;
+    ReactorState send_datacenter_state_;
 };
 }
 #endif
