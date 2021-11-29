@@ -55,7 +55,7 @@ public:
     // 获取当前时间
     static mtime_t now(void);
     // 格式化当前时间
-    std::string format(bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
+    static std::string format(bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
 
     // 当前时间加上一段时间
     void add(const stime_t &t);
@@ -421,6 +421,8 @@ public:
     int get_ip_info(std::string &ip, uint16_t &port);
     std::string get_ip_info(void);
     bool get_socket_state(void) const;
+    int get_addr_by_hostname(std::string hostname, std::string &addr);
+    bool check_ip_addr(std::string addr);
 
     // 关闭套接字
     int close(void);
@@ -430,6 +432,13 @@ public:
     // SHUT_RD(关闭读端)
     // SHUT_RDWR(关闭读和写)
     int shutdown(int how);
+
+public: // 调试代码
+    void print_family(struct addrinfo *aip);
+    void print_type(struct addrinfo *aip);
+    void print_protocol(struct addrinfo *aip);
+    void print_flags(struct addrinfo *aip);
+    void test_getaddr(std::string str);
 
 private:
     SocketTCP(const SocketTCP&) = delete;
