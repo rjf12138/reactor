@@ -138,7 +138,7 @@ NetServer::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl)
 }
 
 int 
-NetServer::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
+NetServer::msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic)
 {
     return 0;
 }
@@ -203,6 +203,7 @@ NetServer::client_func(void* arg)
             ptl::HttpPtl http_ptl;
             ptl::HttpParse_ErrorCode err;
             do {
+                LOG_GLOBAL_DEBUG("http:\n%s", buffer.str().c_str());
                 err = http_ptl.parse(buffer);
                 if (err == ptl::HttpParse_OK) {
                     server_ptr->handle_msg(id, http_ptl);

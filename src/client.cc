@@ -153,7 +153,7 @@ NetClient::notify_client_disconnected(client_id_t cid)
 }
 
 int 
-NetClient::msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg)
+NetClient::msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic)
 {
     return 0;
 }

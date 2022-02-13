@@ -53,7 +53,7 @@ public:
     // 对端连接断开通知
     virtual int notify_client_disconnected(client_id_t cid);
     // 进程内消息收到时回调函数
-    virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
+    virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic);
 
 private:
     static void* client_func(void* arg);// arg: EventHandle_t
@@ -169,7 +169,7 @@ public:
     virtual int notify_server_stop_listen(void);
 
     // 进程内消息收到时回调函数
-    virtual int msg_handler(util::obj_id_t sender, const basic::ByteBuffer &msg);
+    virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic);
 
 private:
     static void* client_func(void* arg); // 处理客户端发过来的数据

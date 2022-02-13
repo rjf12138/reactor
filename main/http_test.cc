@@ -41,22 +41,13 @@ int main(int argc, char **argv)
     reactor_start(rconfig);
 
     TestClient client;
-
-    uint32_t send_gap = 500; // 单位：ms
-    uint64_t send_size = 400;
-    uint64_t send_counts = 10000;
-    std::string str;
-    for (int i = 0; i < send_size; ++i) {
-        str += 'H';
-    }
-    basic::ByteBuffer buffer(str);
-
+    
     while (true) {
         char ch = getchar();
         if (ch == 'q') {
             break;
         } else if (ch == 's') {
-            client.connect("http://fundgz.1234567.com.cn/js/007531.js");
+            client.connect("http://fundgz.1234567.com.cn/js/161725.js");
         }
     }
 

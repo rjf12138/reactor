@@ -116,12 +116,34 @@ private:
 };
 
 //////////////////////////////////////////////////////////////////////////////////////
+template<class T>
+class Atomic {
+public:
+    Atomic(void);
+    ~Atomic(void);
+
+    static bool compare_and_swap(T *reg, T old_value, const T &new_value)
+    {
+    #ifdef __RJF_LINUX__
+        T ret = 0;
+        __asm__ volatile ("lock; cmpxchg %2, %3"
+                            : "=a" (ret), "=m" (*reg)
+                            : "r" (new_value), "m" (*reg), "0" (old_value)
+                            : "cc");
+        return old_value == ret;
+    #elif __RJF_WINDOWS__
+    #endif
+    }
+private:
+};
 
 /////////////////////////////// 线程、线程池 ///////////////////////////////////////////
 // 线程回调函数
 #ifdef __RJF_LINUX__
     typedef void *(*thread_callback)(void*);
+    typedef pthread_t thread_id_t;
 #endif
+
 
 // 通用线程类，直接继承它，设置需要重载的函数
 class Thread : public basic::Logger {
@@ -140,6 +162,12 @@ public:
     // 设置开始标识，设置完后线程可以运行
     virtual int start_handler(void);
 
+    // 如何处理结构体的线程id
+    // 获取当前线程类id
+    thread_id_t get_thread_id(void) const {return thread_id_;}
+    // 获取当前运行的线程id
+    static thread_id_t current_thread_id(void);
+
 private:
     static void* create_func(void *arg);
 
@@ -151,7 +179,7 @@ private:
     bool is_init_;
 #ifdef __RJF_LINUX__
     pthread_attr_t attr_;
-    pthread_t thread_id_;
+    thread_id_t thread_id_;
 #endif
 };
 
@@ -189,7 +217,6 @@ enum ThreadState {
 };
 
 class ThreadPool;
-typedef uint64_t thread_id_t;
 class WorkThread : public Thread {
 public:
     WorkThread(ThreadPool *thread_pool, int idle_life = 30);
@@ -206,7 +233,6 @@ public:
     // 继续执行线程
     virtual int resume(void);
 
-    virtual thread_id_t get_thread_id(void) const {return work_thread_id_;}
     virtual ThreadState get_current_state(void) const {return state_;}
 
 private:
@@ -221,7 +247,6 @@ private:
     time_t idle_life_; // 单位：秒
     time_t start_idle_life_;
     ThreadState state_;
-    thread_id_t work_thread_id_;
 
     Task task_;
     Mutex mutex_;

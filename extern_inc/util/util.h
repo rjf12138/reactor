@@ -126,14 +126,14 @@ public:
     obj_id_t id(void) const {return id_;}
 
     // 消息收到时回调函数
-    virtual int msg_handler(obj_id_t sender, const basic::ByteBuffer &msg);
+    virtual int msg_handler(obj_id_t sender, basic::ByteBuffer &msg, std::string topic);
     // 发送消息（使用当前消息类作为发送ID）
-    int send_msg(obj_id_t recv_id, const basic::ByteBuffer &msg);
+    int send_msg(obj_id_t recv_id, basic::ByteBuffer &msg);
 
     // 检查对象 ID 是否存在
     static bool check_id(const obj_id_t &id);
     // 发送消息
-    static int send_msg(obj_id_t recv_id, const basic::ByteBuffer &msg, obj_id_t sender_id);
+    static int send_msg(obj_id_t recv_id, const std::string topic, const basic::ByteBuffer &msg, obj_id_t sender_id);
 private:
     obj_id_t id_; // 对象ID
 
@@ -157,6 +157,10 @@ public:
 
     // 获取主题的发布者
     obj_id_t get_topic_publisher(const std::string &topic);
+
+private:
+    // topic 只能由下划线、数字和字母组成
+    bool check_topic(const std::string &topic);
 
 private:
     std::set<std::string> topic_;// 当前对象创建的主题
