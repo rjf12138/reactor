@@ -192,20 +192,24 @@ NetClient::client_func(void* arg)
         client_ptr->handle_msg(buffer);
         buffer.clear();
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Http) {
-        ptl::HttpPtl http_ptl;
         ptl::HttpParse_ErrorCode err;
         HttpNetClient* http_client_ptr = dynamic_cast<HttpNetClient*>(client_ptr);
 
         do {
-            err = http_ptl.parse(buffer);
+            LOG_GLOBAL_INFO("%s\n", buffer.str().c_str());
+            err = http_client_ptr->http_ptl_.parse(buffer);
             if (err == ptl::HttpParse_OK) {
-                http_client_ptr->handle_msg(http_ptl);
-                http_ptl.clear();
+                http_client_ptr->handle_msg(http_client_ptr->http_ptl_);
+                http_client_ptr->http_ptl_.clear();
             } else if (err != ptl::HttpParse_ContentNotEnough) {
                 // 协议解析错误时，断开连接
                 LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
                         socket_ptr->get_ip_info().c_str());
                 http_client_ptr->disconnect();
+            } else {
+                if (http_client_ptr->http_ptl_.is_tranfer_encode()) {
+                    http_client_ptr->handle_msg(http_client_ptr->http_ptl_);
+                }
             }
         } while (err == ptl::HttpParse_OK);
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Websocket) {

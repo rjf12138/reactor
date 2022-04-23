@@ -46,7 +46,7 @@
 #define HTTP_HEADER_Date            "Date"          // 创建报文的日期时间
 #define HTTP_HEADER_Pragma          "Pragma"        // 报文指令
 #define HTTP_HEADER_Trailer         "Trailer"       // 报文末端的首部一览
-#define HTTP_HEADER_TranferEncoding "Tranfer-Encoding" // 指定报文主体的传输编码方式
+#define HTTP_HEADER_TransferEncoding "Transfer-Encoding" // 指定报文主体的传输编码方式
 #define HTTP_HEADER_Upgrade         "Upgrade"       // 升级为其他协议
 #define HTTP_HEADER_Via             "Via"           // 代理服务器的相关信息
 #define HTTP_HEADER_Warning         "Warning"       // 错误通知

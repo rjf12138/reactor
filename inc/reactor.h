@@ -90,7 +90,7 @@ public:
     // 接收服务端消息
     virtual int handle_msg(ptl::HttpPtl &http_ptl);
 
-private:
+public:
     ptl::HttpPtl http_ptl_;
 };
 
