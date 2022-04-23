@@ -183,6 +183,8 @@ private:
     os::SocketTCP server_;
 
     NetConnectState state_;
+
+    ptl::HttpPtl http_ptl_;
 };
 }
 

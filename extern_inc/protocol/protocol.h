@@ -28,7 +28,7 @@ enum ParserError {
     ParserError_AmbiguousPort = -3,     // 端口不明确
     ParserError_ErrorPort = -4,         // 端口错误
     ParserError_IncompleteParameters = -5, // 参数不全
-    ParserError_ErrorStartWithResPath = -6 // 资源起始位置解析错误
+    ParserError_ErrorStartWithResPath = -6, // 资源起始位置解析错误
 };
 
 enum ParserState {
@@ -67,7 +67,28 @@ enum HttpParse_ErrorCode {
     HttpParse_ContentNotEnough = -3,
     HttpParse_HttpVersionNotMatch = -4,
     HttpParse_ParseHeaderFailed = -5,
-    HttpParse_NotSupportHttp = -6
+    HttpParse_NotSupportHttp = -6,
+
+    HttpParse_ParseDataLenFailed = -7,        // TranferEncode 数据长度解析错误
+    HttpParse_ParseDataLenUnknownChar = -8,   // TranferEncode 长度解析出现未知字符
+};
+
+enum HttpParseState {
+    HttpParseState_Method,
+    HttpParseState_UrlOrRetCode,
+    HttpParseState_VersionOrPhrase,
+    HttpParseState_HeadOptionKey,
+    HttpParseState_HeadOptionValue,
+    HttpParseState_ContentBody,
+    HttpParseState_TranferEncoding,
+    HttpParseState_End
+};
+
+enum HttpParseTranferEncodeState {
+    HttpParseTranferEncodeState_DataLen,
+    HttpParseTranferEncodeState_ContentBody,
+    HttpParseTranferEncodeState_ChunkEnd,
+    HttpParseTranferEncodeState_End,
 };
 
 class HttpPtl {
@@ -103,8 +124,20 @@ public:
     std::string get_header_option(const std::string &key);
     // 获取报文内容
     basic::ByteBuffer& get_content(void);
+    // 获取tranfer_encode_data数据
+    std::vector<basic::ByteBuffer> &get_tranfer_encode_datas(void);
+    // 检查当前解析的是不是tranfer_encode_data
+    bool is_tranfer_encode(void) const {return is_parse_tranfer_encode_;}
 
 private:
+    HttpParse_ErrorCode parse_tranfer_encoding(basic::ByteBuffer &data);
+
+private:
+    bool is_parse_tranfer_encode_;
+    HttpParseTranferEncodeState parse_tranfer_encode_state_;
+    basic::ByteBufferIterator tranfer_encode_iter_;
+    std::vector<basic::ByteBuffer> tranfer_encode_datas_;
+
     bool is_request_;
     int code_;
     std::string url_;
