@@ -88,7 +88,7 @@ public:
     // 发送数据
     ssize_t send_data(ptl::HttpPtl &http_ptl);
     // 接收服务端消息
-    virtual int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err = ptl::HttpParse_OK);
+    virtual int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err);
 
 public:
     ptl::HttpPtl http_ptl_;
@@ -114,7 +114,7 @@ public:
     // 发送数据
     ssize_t send_data(basic::ByteBuffer &content, int opcode, bool is_mask = false);
     // 接收服务端消息
-    virtual int handle_msg(ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err = ptl::WebsocketParse_OK);
+    virtual int handle_msg(ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
 
 private:
     // 发送 websocket 协议升级请求
@@ -158,9 +158,9 @@ public:
     // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Raw 才会被调用
     virtual int handle_msg(client_id_t cid, ByteBuffer &buffer);
     // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Http 才会被调用
-    virtual int handle_msg(client_id_t cid, ptl::HttpPtl &ptl, ptl::HttpParse_ErrorCode err = ptl::HttpParse_OK);
+    virtual int handle_msg(client_id_t cid, ptl::HttpPtl &ptl, ptl::HttpParse_ErrorCode err);
     // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Websocket 才会被调用
-    virtual int handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err = ptl::WebsocketParse_OK);
+    virtual int handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
     // 客户端连接到服务器时会调用
     virtual int handle_client_conn(client_id_t cid);
     // 客户端连接断开时会调用

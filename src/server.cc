@@ -205,16 +205,17 @@ NetServer::client_func(void* arg)
                 LOG_GLOBAL_DEBUG("http:\n%s", buffer.str().c_str());
                 err = server_ptr->http_ptl_.parse(buffer);
                 if (err == ptl::HttpParse_OK) {
-                    server_ptr->handle_msg(id, server_ptr->http_ptl_);
+                    server_ptr->handle_msg(id, server_ptr->http_ptl_, ptl::HttpParse_OK);
                     server_ptr->http_ptl_.clear();
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, client: %s]", 
                             server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->get_ip_info().c_str());
+                    server_ptr->handle_msg(id, server_ptr->http_ptl_, err);
                     server_ptr->close_client(id);
                 } else {
                     if (server_ptr->http_ptl_.is_tranfer_encode()) {
-                        server_ptr->handle_msg(id, server_ptr->http_ptl_);
+                        server_ptr->handle_msg(id, server_ptr->http_ptl_, err);
                     }
                 }
             } while (err == ptl::HttpParse_OK);
@@ -224,12 +225,13 @@ NetServer::client_func(void* arg)
             do {
                 err = ws_ptl.parse(buffer);
                 if (err == ptl::WebsocketParse_OK) {
-                    server_ptr->handle_msg(id, ws_ptl);
+                    server_ptr->handle_msg(id, ws_ptl, ptl::WebsocketParse_OK);
                     ws_ptl.clear();
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: WebSocket, client: %s]", 
                             server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->get_ip_info().c_str());
+                    server_ptr->handle_msg(id, ws_ptl, err);
                     server_ptr->close_client(id);
                 }
             } while (err == ptl::WebsocketParse_OK);

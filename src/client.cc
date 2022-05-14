@@ -199,16 +199,17 @@ NetClient::client_func(void* arg)
             LOG_GLOBAL_INFO("%s\n", buffer.str().c_str());
             err = http_client_ptr->http_ptl_.parse(buffer);
             if (err == ptl::HttpParse_OK) {
-                http_client_ptr->handle_msg(http_client_ptr->http_ptl_);
+                http_client_ptr->handle_msg(http_client_ptr->http_ptl_, ptl::HttpParse_OK);
                 http_client_ptr->http_ptl_.clear();
             } else if (err != ptl::HttpParse_ContentNotEnough) {
                 // 协议解析错误时，断开连接
                 LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
                         socket_ptr->get_ip_info().c_str());
+                http_client_ptr->handle_msg(http_client_ptr->http_ptl_, err);
                 http_client_ptr->disconnect();
             } else {
                 if (http_client_ptr->http_ptl_.is_tranfer_encode()) {
-                    http_client_ptr->handle_msg(http_client_ptr->http_ptl_);
+                    http_client_ptr->handle_msg(http_client_ptr->http_ptl_, err);
                 }
             }
         } while (err == ptl::HttpParse_OK);
@@ -245,12 +246,13 @@ NetClient::client_func(void* arg)
             do {
                 err = ws_ptl.parse(buffer);
                 if (err == ptl::WebsocketParse_OK) {
-                    ws_client_ptr->handle_msg(ws_ptl);
+                    ws_client_ptr->handle_msg(ws_ptl, ptl::WebsocketParse_OK);
                     ws_ptl.clear();
                 } else if (err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse data failed[PTL: Websocket, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
+                    ws_client_ptr->handle_msg(ws_ptl, err);
                     ws_client_ptr->disconnect();
                 }
             } while (err == ptl::WebsocketParse_OK);
