@@ -70,9 +70,9 @@ int main(int argc, char **argv)
     TestClient client;
     client.connect("http://192.168.0.103:12138");
 
-    uint32_t send_gap = 500; // 单位：ms
-    uint64_t send_size = 400;
-    uint64_t send_counts = 10000;
+    uint32_t send_gap = 50; // 单位：ms
+    uint64_t send_size = 100;
+    uint64_t send_counts = 80000;
     std::string str;
     for (int i = 0; i < send_size; ++i) {
         str += 'H';

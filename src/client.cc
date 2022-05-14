@@ -311,7 +311,7 @@ HttpNetClient::send_data(ptl::HttpPtl &http_ptl)
 }
 
 int 
-HttpNetClient::handle_msg(ptl::HttpPtl &ptl)
+HttpNetClient::handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err)
 {
     return 0;
 }
@@ -387,7 +387,7 @@ WSNetClient::ws_upgrade_request(basic::ByteBuffer &content)
 
 
 int
-WSNetClient::handle_msg(ptl::WebsocketPtl &ptl)
+WSNetClient::handle_msg(ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err)
 {
     return 0;
 }

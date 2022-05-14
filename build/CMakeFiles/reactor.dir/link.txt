@@ -1,2 +1,0 @@
-/usr/bin/ar qc libreactord.a CMakeFiles/reactor.dir/src/reactor.cc.o CMakeFiles/reactor.dir/src/server.cc.o CMakeFiles/reactor.dir/src/client.cc.o CMakeFiles/reactor.dir/reactor/linux_reactor.cc.o
-/usr/bin/ranlib libreactord.a

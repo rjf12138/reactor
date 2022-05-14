@@ -239,10 +239,13 @@ SendDataCenter::send_loop(void* arg)
                 continue;
             }
 
+            iter->second->buff_mutex.lock();
             if (iter->second->send_buffer.data_size() == 0) {
+                iter->second->buff_mutex.unlock();
                 continue;
             }
             iter->second->socket_ptr->send(iter->second->send_buffer);
+            iter->second->buff_mutex.unlock();
         }
     }
     ReactorManager::instance().set_send_datacenter_state(ReactorState_Exit);

@@ -124,14 +124,14 @@ NetServer::handle_msg(client_id_t cid, ByteBuffer &buffer)
 }
 
 int 
-NetServer::handle_msg(client_id_t cid, ptl::HttpPtl &ptl)
+NetServer::handle_msg(client_id_t cid, ptl::HttpPtl &ptl, ptl::HttpParse_ErrorCode err)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;
 }
 
 int 
-NetServer::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl)
+NetServer::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err)
 {
     // 修改数据时，需要上锁（存在多个线程修改同个变量的可能性）
     return 0;

@@ -7,12 +7,12 @@ public:
     TestClient(void) {}
     ~TestClient(void) {}
 
-    int handle_msg(ptl::HttpPtl &http_ptl) {
+    int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err) {
         basic::ByteBuffer buffer;
         http_ptl.generate(buffer);
-        std::cout << buffer.str() << std::endl << std::endl;
+        LOG_GLOBAL_INFO("HttpErr: %d\n", err);
+        LOG_GLOBAL_INFO("Data: \n%s\n\n", buffer.str().c_str());
 
-        disconnect();
         return 0;
     }
 
@@ -22,14 +22,18 @@ public:
     }
 
     int request_http(void) {
-        ptl.set_request(HTTP_METHOD_GET, url_); // 服务端返回是 /Response
+        ptl.set_request(HTTP_METHOD_GET, url_parser_.res_path_);
+        ptl.set_header_option(HTTP_HEADER_UserAgent, "WeHttp/1.0");
+        ptl.set_header_option(HTTP_HEADER_Host, "fundgz.1234567.com.cn");
+        ptl.set_header_option(HTTP_HEADER_Connection, "Keep-Alive");
+
         send_data(ptl);
+        ptl.clear();
+
         return 0;
     }
 private:
     ptl::HttpPtl ptl;
-    ByteBuffer request_buffer;
-    ByteBuffer response_buffer;
 };
 
 int main(int argc, char **argv)
@@ -48,6 +52,8 @@ int main(int argc, char **argv)
             break;
         } else if (ch == 's') {
             client.connect("http://fundgz.1234567.com.cn/js/161725.js");
+        } else if (ch == 'r') {
+            client.request_http();
         }
     }
 
