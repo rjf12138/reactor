@@ -19,17 +19,18 @@ enum TimerEventAttr {
 typedef uint32_t timer_id_t;
 
 typedef void* (*TimeEvent_callback_t)(void*);
-typedef struct TimerEvent {
+struct TimerEvent {
     friend class Timer;
-private:
-    timer_id_t id; // 添加到定时器中时会返回一个ID
-    os::mtime_t expire_time; // 定时器触发的时间，不能小于当前时间
-
 public:
-    os::mtime_t wait_time; // 定时器等待的间隔时间。单位: ms, 必须大于 0
-    void* TimeEvent_arg; // 回调函数的参数
-    TimeEvent_callback_t TimeEvent_callback; // 定时器到期时的回调函数
-    TimerEventAttr attr;
+    TimerEvent(void)
+    :wait_time(0),
+    TimeEvent_arg(nullptr),
+    TimeEvent_callback(nullptr),
+    attr(TimerEventAttr_Exit),
+    id(INVAILD_TIMER_ID),
+    expire_time(0) {}
+
+    ~TimerEvent(void) {}
 
     bool operator>(const TimerEvent &rhs) {
         return this->expire_time > rhs.expire_time;
@@ -43,16 +44,17 @@ public:
         return this->expire_time == rhs.expire_time;
     }
 
-    TimerEvent(void)
-    :id(INVAILD_TIMER_ID),
-    expire_time(0),
-    wait_time(0),
-    attr(TimerEventAttr_Exit),
-    TimeEvent_arg(nullptr),
-    TimeEvent_callback(nullptr) {}
+public:
+    os::mtime_t wait_time; // 定时器等待的间隔时间。单位: ms, 必须大于 0
+    void* TimeEvent_arg; // 回调函数的参数
+    TimeEvent_callback_t TimeEvent_callback; // 定时器到期时的回调函数
+    TimerEventAttr attr;
 
-    ~TimerEvent(void) {}
-} TimerEvent_t;
+private:
+    timer_id_t id; // 添加到定时器中时会返回一个ID
+    os::mtime_t expire_time; // 定时器触发的时间，不能小于当前时间
+};
+typedef TimerEvent TimerEvent_t;
 
 class Timer : public os::Thread {
     enum TimerState {
@@ -68,13 +70,13 @@ public:
     // 添加定时器,错误返回-1， 成功返回一个定时器id
     timer_id_t add(TimerEvent_t &event);
     // 根据定时器ID，取消定时器
-    int cancel(timer_id_t id);
+    ssize_t cancel(timer_id_t id);
 
 private:
     virtual int run_handler(void);
     virtual int stop_handler(void);
     // 重新添加定时器
-    int readd(TimerEvent_t &event);
+    ssize_t readd(TimerEvent_t &event);
 private:
     TimerState state_;
     os::Time time_;
@@ -114,10 +116,11 @@ typedef struct MsgBuffer_Info {
 } MsgBuffer_Info_t;
 
 typedef uint32_t obj_id_t;
+typedef uint32_t topic_t;
 
 class MsgObject {
     typedef std::map<int, MsgObject*>  MSG_OBJECT_MAP;
-    typedef std::map<std::string, std::pair<obj_id_t, std::set<obj_id_t>>>  SUBSCRIBE_TOPIC_OBJECTS_MAP;
+    typedef std::map<topic_t, std::pair<obj_id_t, std::set<obj_id_t>>>  SUBSCRIBE_TOPIC_OBJECTS_MAP;
 public:
     MsgObject(void);
     virtual ~MsgObject(void);
@@ -126,14 +129,14 @@ public:
     obj_id_t id(void) const {return id_;}
 
     // 消息收到时回调函数
-    virtual int msg_handler(obj_id_t sender, basic::ByteBuffer &msg, std::string topic);
+    virtual int msg_handler(obj_id_t sender, basic::ByteBuffer &msg, topic_t topic);
     // 发送消息（使用当前消息类作为发送ID）
     int send_msg(obj_id_t recv_id, basic::ByteBuffer &msg);
 
     // 检查对象 ID 是否存在
     static bool check_id(const obj_id_t &id);
     // 发送消息
-    static int send_msg(obj_id_t recv_id, const std::string topic, const basic::ByteBuffer &msg, obj_id_t sender_id);
+    static int send_msg(obj_id_t recv_id, const topic_t topic, const basic::ByteBuffer &msg, obj_id_t sender_id);
 private:
     obj_id_t id_; // 对象ID
 
@@ -144,26 +147,26 @@ public:
 // 主题的创建者通过主题发布消息，订阅该主题的对象都能收到该消息
 
     // 创建主题
-    int create_topic(const std::string &topic);
+    int create_topic(const topic_t &topic);
     // 删除主题
-    int delete_topic(const std::string &topic);
+    int delete_topic(const topic_t &topic);
     // 发布消息
-    int publish_msg(const std::string &topic, const basic::ByteBuffer &msg);
+    int publish_msg(const topic_t &topic, const basic::ByteBuffer &msg);
 
     // 订阅主题
-    int subscribe_to_topic(const std::string &topic);
+    int subscribe_to_topic(const topic_t &topic);
     // 取消订阅
-    int unsubscribe_topic(const std::string &topic);
+    int unsubscribe_topic(const topic_t &topic);
 
     // 获取主题的发布者
-    obj_id_t get_topic_publisher(const std::string &topic);
+    obj_id_t get_topic_publisher(const topic_t &topic);
 
 private:
     // topic 只能由下划线、数字和字母组成
-    bool check_topic(const std::string &topic);
+    bool check_topic(const topic_t &topic);
 
 private:
-    std::set<std::string> topic_;// 当前对象创建的主题
+    std::set<topic_t> topic_;// 当前对象创建的主题
     static os::Mutex topic_lock_;
     static SUBSCRIBE_TOPIC_OBJECTS_MAP subscribe_object_; // 所有主题以及订阅主题的对象
 

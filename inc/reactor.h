@@ -49,11 +49,11 @@ public:
     ssize_t send_data(const ByteBuffer &buff);
 
     // 处理服务器发送的数据
-    virtual int handle_msg(basic::ByteBuffer &buffer);
+    int handle_msg(basic::ByteBuffer &buffer);
     // 对端连接断开通知
     virtual int notify_client_disconnected(client_id_t cid);
     // 进程内消息收到时回调函数
-    virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic);
+    virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, util::topic_t topic);
 
 private:
     static void* client_func(void* arg);// arg: EventHandle_t
@@ -112,13 +112,13 @@ public:
     int cancel_timer_task(util::timer_id_t tid) {return NetClient::cancel_timer_task(tid);}
 
     // 发送数据
-    ssize_t send_data(basic::ByteBuffer &content, int opcode, bool is_mask = false);
+    ssize_t send_data(basic::ByteBuffer &content, int8_t opcode, bool is_mask = false);
     // 接收服务端消息
     virtual int handle_msg(ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
 
 private:
     // 发送 websocket 协议升级请求
-    int ws_upgrade_request(basic::ByteBuffer &content);
+    ssize_t ws_upgrade_request(basic::ByteBuffer &content);
     // 处理 websocket 协议升级回复
     int handle_ws_upgrade_response(ptl::HttpPtl &ptl);
 
@@ -135,7 +135,7 @@ public:
     virtual ~NetServer(void);
 
     // 开启服务器
-    int start(const std::string &ip, int port, ptl::ProtocolType type);
+    int start(const std::string &ip, uint16_t port, ptl::ProtocolType type);
     // 停止服务器
     int stop(void);
 
@@ -169,7 +169,7 @@ public:
     virtual int notify_server_stop_listen(void);
 
     // 进程内消息收到时回调函数
-    virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic);
+    virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, util::topic_t topic);
 
 private:
     static void* client_func(void* arg); // 处理客户端发过来的数据

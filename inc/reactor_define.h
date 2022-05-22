@@ -84,10 +84,10 @@ typedef struct EventHandle {
 
     EventHandle(void)
     : acceptor(nullptr),
+    state(EventHandleState_Idle),
     client_arg(nullptr),
     client_func(nullptr),
-    client_conn_func(nullptr),
-    state(EventHandleState_Idle)
+    client_conn_func(nullptr)
     {}
 } EventHandle_t;
 

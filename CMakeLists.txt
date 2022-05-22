@@ -5,16 +5,26 @@ project(reactor)
 
 set(CMAKE_DEBUG_POSTFIX d)
 
-# 指定c++标准: 默认是 c++11
-add_library(reactor_compiler_flags INTERFACE)
-target_compile_features(reactor_compiler_flags INTERFACE cxx_std_11)
-# 设置 c++ 警告标志
-set(gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU>")
-set(msvc_cxx "$<COMPILE_LANG_AND_ID:CXX,MSVC>")
-
-target_compile_options(reactor_compiler_flags INTERFACE
-		$<${gcc_like_cxx}:$<BUILD_INTERFACE:-Wall;-Wextra;-Wshadow;-Wformat=2;-Wunused>>
-		$<${msvc_cxx}:$<BUILD_INTERFACE:-W3>>)
+set(CXX_FLAGS
+    -g
+    # -DVALGRIND
+    -DCHECK_PTHREAD_RETURN_VALUE
+    -D_FILE_OFFSET_BITS=64
+    -Wall
+    -Wextra
+    -Werror
+    -Wconversion
+    -Wno-unused-parameter
+    -Wold-style-cast
+    -Woverloaded-virtual
+    -Wpointer-arith
+    -Wshadow
+    -Wwrite-strings
+    -march=native
+    # -MMD
+    -rdynamic
+    )
+string(REPLACE ";" " " CMAKE_CXX_FLAGS "${CXX_FLAGS}")
 
 # 设置生成文件输出路径
 set(LIBRARY_OUTPUT_PATH, ./output/debug/lib)

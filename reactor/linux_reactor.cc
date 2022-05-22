@@ -46,9 +46,10 @@ ReactorManager::instance(void)
 }
 
 ReactorManager::ReactorManager(void)
-: send_datacenter_ptr(nullptr),
+:
  main_reactor_ptr(nullptr),
- sub_reactor_ptr(nullptr)
+ sub_reactor_ptr(nullptr),
+ send_datacenter_ptr(nullptr)
 {
     //thread_pool_.show_threadpool_info();
 }
@@ -149,7 +150,7 @@ ReactorManager::add_timer(util::TimerEvent_t event)
 int 
 ReactorManager::cancel_timer(int timer_id)
 {
-    return timer_.cancel(timer_id);
+    return static_cast<int>(timer_.cancel(timer_id));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -259,7 +260,7 @@ SendDataCenter::exit_loop(void* arg)
         return nullptr;
     }
 
-    SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
+    // SendDataCenter *sender_ptr = reinterpret_cast<SendDataCenter*>(arg);
     ReactorManager::instance().set_send_datacenter_state(ReactorState_WaitExit);
     // 等待当前执行的任务退出
     while (ReactorManager::instance().get_send_datacenter_state() == ReactorState_WaitExit) {
@@ -272,8 +273,9 @@ SendDataCenter::exit_loop(void* arg)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 SubReactor::SubReactor(int events_max_size, int timeout)
-: events_max_size_(events_max_size),
-  timeout_(timeout)
+: 
+timeout_(timeout),
+events_max_size_(events_max_size)
 {
     ReactorManager::instance().set_sub_reactor_state(ReactorState_Exit);
     if (events_max_size_ < 0) {
@@ -451,7 +453,7 @@ SubReactor::event_wait(void *arg)
         return nullptr;
     }
 
-    SubReactor *epoll_ptr = (SubReactor*)arg;
+    SubReactor *epoll_ptr = reinterpret_cast<SubReactor*>(arg);
     ReactorManager::instance().set_sub_reactor_state(ReactorState_Running);
     while (ReactorManager::instance().get_sub_reactor_state() == ReactorState_Running) {
         int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
@@ -508,7 +510,7 @@ SubReactor::event_exit(void *arg)
         return nullptr;
     }
 
-    SubReactor *epoll_ptr = (SubReactor*)arg;
+    //SubReactor *epoll_ptr = reinterpret_cast<SubReactor*>(arg);
     ReactorManager::instance().set_sub_reactor_state(ReactorState_WaitExit);
     // 等待当前执行的任务退出
     while (ReactorManager::instance().get_sub_reactor_state() == ReactorState_WaitExit) {
@@ -520,8 +522,8 @@ SubReactor::event_exit(void *arg)
 
 ///////////////////////////////////////////////////////////////////////////////////////
 MainReactor::MainReactor(int events_max_size, int timeout)
-: events_max_size_(events_max_size),
-  timeout_(timeout)
+: timeout_(timeout),
+events_max_size_(events_max_size)
 {
     ReactorManager::instance().set_main_reactor_state(ReactorState_Exit);
     if (events_max_size_ <= 0) {
@@ -661,18 +663,18 @@ MainReactor::event_wait(void *arg)
         return nullptr;
     }
 
-    MainReactor *epoll_ptr = (MainReactor*)arg;
+    MainReactor *epoll_ptr = reinterpret_cast<MainReactor*>(arg);
     ReactorManager::instance().set_main_reactor_state(ReactorState_Running);
     while (ReactorManager::instance().get_main_reactor_state() == ReactorState_Running) {
-        int ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
-        if (ret < 0 && errno != EINTR) {
+        int event_ret = ::epoll_wait(epoll_ptr->epfd_, epoll_ptr->events_, epoll_ptr->events_max_size_, epoll_ptr->timeout_);
+        if (event_ret < 0 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
             return nullptr;
-        } else if (ret == 0) {
+        } else if (event_ret == 0) {
             continue;
         }
 
-        for (int i = 0; i < ret; ++i) {
+        for (int i = 0; i < event_ret; ++i) {
             int ready_socket_fd = epoll_ptr->events_[i].data.fd;
             EventHandle_t *handle_ptr = epoll_ptr->get_event_handle(ready_socket_fd);
             if (handle_ptr == nullptr) {
@@ -683,13 +685,13 @@ MainReactor::event_wait(void *arg)
             int client_sock_fd = 0;
             struct sockaddr_in addr;
             socklen_t addrlen = sizeof(addr);
-            if (handle_ptr->acceptor->accept(client_sock_fd, (sockaddr*)&addr, &addrlen) >= 0 && handle_ptr->exit == false) {
+            if (handle_ptr->acceptor->accept(client_sock_fd, reinterpret_cast<sockaddr*>(&addr), &addrlen) >= 0 && handle_ptr->exit == false) {
                 ClientConn_t *client_conn_ptr = new ClientConn_t;
                 client_conn_ptr->client_id = client_sock_fd;
-                client_conn_ptr->socket_ptr->set_socket(client_sock_fd, (sockaddr_in*)&addr, &addrlen);
+                client_conn_ptr->socket_ptr->set_socket(client_sock_fd, reinterpret_cast<sockaddr_in*>(&addr), &addrlen);
                 client_conn_ptr->socket_ptr->setnonblocking();
-                int ret = ReactorManager::instance().get_sub_reactor()->add_client_conn(handle_ptr->server_id, client_conn_ptr);
-                if (ret < 0) {
+                int reactor_ret = ReactorManager::instance().get_sub_reactor()->add_client_conn(handle_ptr->server_id, client_conn_ptr);
+                if (reactor_ret < 0) {
                     client_conn_ptr->socket_ptr->close();
                     delete client_conn_ptr;
                     continue;
@@ -714,7 +716,7 @@ MainReactor::event_exit(void *arg)
         return nullptr;
     }
 
-    MainReactor *epoll_ptr = (MainReactor*)arg;
+    //MainReactor *epoll_ptr = reinterpret_cast<MainReactor*>(arg);
     ReactorManager::instance().set_main_reactor_state(ReactorState_WaitExit);
     // 等待当前执行的任务退出
     while (ReactorManager::instance().get_main_reactor_state() == ReactorState_WaitExit) {

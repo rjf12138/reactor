@@ -11,16 +11,16 @@ public:
     ~MinHeap(void);
 
     // 往最小堆添加元素
-    int push(const T &data);
+    ssize_t push(const T &data);
     // 从最小堆删除元素
-    int pop(T &data);
+    ssize_t pop(T &data);
     // 强制从堆中删除一个元素
-    int remove(int pos);
+    ssize_t remove(ssize_t pos);
     // 堆中元素个数
-    int size(void) const {return size_;}
+    ssize_t size(void) const {return size_;}
     bool empty(void) const {return this->size() == 0 ? true : false;}
 
-    T& operator[](int pos);
+    T& operator[](ssize_t pos);
 private:
     void swap(T &p, T &q) {
         auto tmp = p;
@@ -29,7 +29,7 @@ private:
     }
 private:
     std::vector<T> heap_;
-    int size_;
+    ssize_t size_;
 };
 
 template <class T>
@@ -46,9 +46,9 @@ MinHeap<T>::~MinHeap(void)
 }
 
 template <class T>
-int MinHeap<T>::push(const T &data)
+ssize_t MinHeap<T>::push(const T &data)
 {
-    if (size_ == heap_.size() - 1) {
+    if (size_ == static_cast<ssize_t>(heap_.size()) - 1) {
         heap_.push_back(data);
     } else {
         heap_[size_ + 1] = data;
@@ -71,7 +71,7 @@ int MinHeap<T>::push(const T &data)
 }
 
 template <class T>
-int MinHeap<T>::pop(T &data)
+ssize_t MinHeap<T>::pop(T &data)
 {
     if (this->empty()) {
         return 0;
@@ -81,12 +81,12 @@ int MinHeap<T>::pop(T &data)
     heap_[1] = heap_[size_];
     --size_;
 
-    int pos = 1;
+    ssize_t pos = 1;
     while (true)
     {
-        int min_pos = pos;
-        int left = min_pos * 2;
-        int right = min_pos *2 + 1;
+        ssize_t min_pos = pos;
+        ssize_t left = min_pos * 2;
+        ssize_t right = min_pos *2 + 1;
         if (left <= size_ && heap_[min_pos] > heap_[left]) {
             min_pos = left;
         }
@@ -106,7 +106,7 @@ int MinHeap<T>::pop(T &data)
 }
 
 template <class T>
-int MinHeap<T>::remove(int pos)
+ssize_t MinHeap<T>::remove(ssize_t pos)
 {
     ++pos; // heap 中坐标是从1开始，外部坐标从0开始
     if (pos < 1 || pos > size_) {
@@ -129,7 +129,7 @@ int MinHeap<T>::remove(int pos)
 }
 
 template <class T>
-T& MinHeap<T>::operator[](int pos)
+T& MinHeap<T>::operator[](ssize_t pos)
 {
     if (pos < 0 || pos >= size_) {
         throw std::runtime_error("out of range");

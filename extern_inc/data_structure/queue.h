@@ -1,7 +1,6 @@
 // 模板类定义声明要在同一个文件中
 #ifndef __QUEUE_H__
 #define __QUEUE_H__
-
 #include <queue>
 namespace ds {
 
@@ -55,7 +54,7 @@ int Queue<T>::pop(T &data)
 template<class T> 
 inline int Queue<T>::size(void) const
 {
-    return queue_.size();
+    return static_cast<int>(queue_.size());
 }
 
 template<class T>

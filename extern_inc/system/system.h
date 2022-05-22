@@ -20,8 +20,9 @@ extern basic::msg_to_stream_callback g_msg_to_stream_fatal;
 
 extern void set_systemcall_message_output_callback(basic::InfoLevel level, basic::msg_to_stream_callback func);
 
-// 休眠时间,单位：毫秒 
-// int os_sleep(int millisecond);
+// 执行shell命令行
+extern int exe_shell_cmd(std::string &result, const char *format, ...);
+extern int exe_shell_cmd_to_stdin(const char *format, ...);
 
 /*
 * 所有的类成员函数成功了返回0， 失败返回非0值
@@ -29,13 +30,17 @@ extern void set_systemcall_message_output_callback(basic::InfoLevel level, basic
 //////////////////////////// 时间 //////////////////////////////////////////////////
 typedef uint64_t mtime_t; 
 typedef struct stime {
+    uint32_t year;
+    uint32_t month;
     uint32_t days;
     uint32_t hours;
     uint32_t mins;
     uint32_t secs;
 
     stime(void)
-    :days(0),
+    :year(0),
+    month(0),
+    days(0),
     hours(0),
     mins(0),
     secs(0) {}
@@ -49,14 +54,14 @@ public:
     Time(void);
     ~Time(void);
 
-    // 设置时间
-    void set_time(mtime_t tm);
 
     // 获取当前时间
     static mtime_t now(void);
     // 格式化当前时间
     static std::string format(bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
 
+    // 设置时间
+    void set_time(mtime_t tm);
     // 当前时间加上一段时间
     void add(const stime_t &t);
     // 当前时间减去一段时间
@@ -66,7 +71,7 @@ public:
     // 线程休眠时间
     static int sleep(uint32_t mills);
     // 字符串转成毫秒数
-    static mtime_t convert_to(const std::string &ti);
+    static mtime_t convert_to(const std::string &ti, bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
     // 毫秒数转成字符串
     static std::string convert_to(const mtime_t &ti, bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
 
@@ -76,6 +81,33 @@ private:
 
 private:
     mtime_t time_;
+};
+
+/////////////////////////////// 终端界面 ///////////////////////////////////////////
+#define PrintChars  "~`!@#$%^&*()_-+={}[]\\|:;\"',<.>/? *-+"
+#define ProjWin_RetEmpty    ""
+#define ProjWin_InputPath   "NULL"
+// 定义key
+#define Keyboard_Tab        9
+#define Keyboard_Enter      10
+#define Keyboard_Esc        27
+
+#define Form_MaxInput       69
+
+class TerminalWindow {
+public:
+    TerminalWindow(void);
+    virtual ~TerminalWindow(void);
+
+    /// 失败返回"", 主动输入路径返回 "-Input"
+    std::pair<std::string, std::string> display_menu(std::vector<std::string> proj_name, std::vector<std::string> proj_path);
+    /// 获取输入
+    int get_input(std::string &ret, std::string title, std::string default_value = "");
+    // 消息提示
+    bool message(std::string title);
+
+private:
+    void print_in_middle(void *win, int starty, int startx, int width, const char *string, uint32_t color);
 };
 /////////////////////////////// 获取系统信息 ////////////////////////////////////////
 class SystemInfo {
@@ -320,9 +352,9 @@ private:
     // 休眠指定线程
     int thread_move_to_idle_map(thread_id_t thread_id);
     // 运行指定线程
-    int thread_move_to_running_map(thread_id_t thread_id);
+    int wakeup_specify_thread(thread_id_t thread_id);
     // 随机唤醒一个线程
-    int thread_move_to_running_map(int thread_cnt);
+    std::size_t wakeup_random_thread(std::size_t thread_cnt);
     // 调整线程数量
     int ajust_threads_num(void);
     
@@ -432,8 +464,8 @@ public:
     // cliaddr: 返回的客户端IP信息
     // addrlen: 设置cliaddr 结构的大小
     int accept(int &clisock, struct sockaddr *cliaddr = nullptr, socklen_t *addrlen = nullptr);
-    int recv(basic::ByteBuffer &buff, int flags = 0);
-    int send(basic::ByteBuffer &buff, int flags = 0);
+    ssize_t recv(basic::ByteBuffer &buff, int flags = 0);
+    ssize_t send(basic::ByteBuffer &buff, int flags = 0);
 
     // 配置socket
     // 设置成非阻塞

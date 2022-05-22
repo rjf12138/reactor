@@ -53,7 +53,7 @@ public:
 public:
     ptl::ProtocolType type_;    // 协议类型
     std::string addr_;  // 服务器地址
-    int port_;      // 服务器端口
+    uint16_t port_;      // 服务器端口
     std::string res_path_; // 资源路径
     std::string url_; // 资源路径加参数
     std::map<std::string, std::string> param_; // 参数
@@ -173,7 +173,7 @@ public:
     virtual ~WebsocketPtl(void);
 
     WebsocketParse_ErrorCode parse(basic::ByteBuffer &buff);
-    int32_t generate(basic::ByteBuffer &out, basic::ByteBuffer &content, int8_t nOpcode, bool bMask = false);
+    ssize_t generate(basic::ByteBuffer &out, basic::ByteBuffer &content, int8_t nOpcode, bool bMask = false);
 
     // 客户端请求将链接升级为 websocket 的 http 请求包
     int get_upgrade_packet(HttpPtl &request, basic::ByteBuffer &content, std::string url = "/", std::string host = "websocket client");

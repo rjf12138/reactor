@@ -153,7 +153,7 @@ NetClient::notify_client_disconnected(client_id_t cid)
 }
 
 int 
-NetClient::msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic)
+NetClient::msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, util::topic_t topic)
 {
     return 0;
 }
@@ -165,8 +165,8 @@ NetClient::client_func(void* arg)
         return nullptr;
     }
 
-    int size = 0;
-    NetClient *client_ptr = (NetClient*)arg;
+    ssize_t size = 0;
+    NetClient *client_ptr = reinterpret_cast<NetClient*>(arg);
     if (client_ptr->get_state() != NetConnectState_Connected) {
         return nullptr;
     }
@@ -215,7 +215,7 @@ NetClient::client_func(void* arg)
         } while (err == ptl::HttpParse_OK);
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Websocket) {
         ptl::HttpPtl http_ptl;
-        ptl::HttpParse_ErrorCode err;
+        ptl::HttpParse_ErrorCode http_err;
         ptl::WebsocketPtl ws_ptl;
         WSNetClient* ws_client_ptr = dynamic_cast<WSNetClient*>(client_ptr);
 
@@ -223,8 +223,8 @@ NetClient::client_func(void* arg)
         {
         case NetConnectState_UpgradePtl: {
             do {
-                err = http_ptl.parse(buffer);
-                if (err == ptl::HttpParse_OK) {
+                http_err = http_ptl.parse(buffer);
+                if (http_err == ptl::HttpParse_OK) {
                     int ret = ws_ptl.check_upgrade_response(http_ptl);
                     if (ret == -1) {
                         // 协议升级失败，断开连接
@@ -233,29 +233,29 @@ NetClient::client_func(void* arg)
                         client_ptr->disconnect();
                     }
                     ws_client_ptr->set_state(NetConnectState_Connected);
-                } else if (err != ptl::HttpParse_ContentNotEnough) {
+                } else if (http_err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse data failed[PTL: HTTP, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
                     ws_client_ptr->disconnect();
                 }
-            } while (err == ptl::HttpParse_OK);
+            } while (http_err == ptl::HttpParse_OK);
         } break;
         case NetConnectState_Connected: {
-            ptl::WebsocketParse_ErrorCode err;
+            ptl::WebsocketParse_ErrorCode ws_err;
             do {
-                err = ws_ptl.parse(buffer);
-                if (err == ptl::WebsocketParse_OK) {
+                ws_err = ws_ptl.parse(buffer);
+                if (ws_err == ptl::WebsocketParse_OK) {
                     ws_client_ptr->handle_msg(ws_ptl, ptl::WebsocketParse_OK);
                     ws_ptl.clear();
-                } else if (err != ptl::WebsocketParse_PacketNotEnough) {
+                } else if (ws_err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse data failed[PTL: Websocket, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
-                    ws_client_ptr->handle_msg(ws_ptl, err);
+                    ws_client_ptr->handle_msg(ws_ptl, ws_err);
                     ws_client_ptr->disconnect();
                 }
-            } while (err == ptl::WebsocketParse_OK);
+            } while (ws_err == ptl::WebsocketParse_OK);
         } break;
         default:
             break;
@@ -344,7 +344,7 @@ WSNetClient::connect(const std::string &url, basic::ByteBuffer &content)
         return -1;
     }
 
-    return ws_upgrade_request(content);
+    return static_cast<int>(ws_upgrade_request(content));
 }
 
 int 
@@ -367,14 +367,14 @@ WSNetClient::disconnect(void)
 }
 
 ssize_t 
-WSNetClient::send_data(basic::ByteBuffer &content, int opcode, bool is_mask)
+WSNetClient::send_data(basic::ByteBuffer &content, int8_t opcode, bool is_mask)
 {
     basic::ByteBuffer buffer;
     ws_ptl_.generate(buffer, content, opcode, is_mask);
     return NetClient::send_data(buffer);
 }
 
-int
+ssize_t
 WSNetClient::ws_upgrade_request(basic::ByteBuffer &content)
 {
     ptl::HttpPtl http_ptl;

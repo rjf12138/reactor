@@ -7,7 +7,7 @@ public:
     TestClient(void) {}
     ~TestClient(void) {}
 
-    int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err) {
+    virtual int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err) {
         basic::ByteBuffer buffer;
         http_ptl.generate(buffer);
         LOG_GLOBAL_INFO("HttpErr: %d\n", err);
@@ -45,10 +45,11 @@ int main(int argc, char **argv)
     reactor_start(rconfig);
 
     TestClient client;
-    
+    // 先按s链接到服务器，然后按r发送请求
     while (true) {
-        char ch = getchar();
+        int ch = getchar();
         if (ch == 'q') {
+            reactor_stop();
             break;
         } else if (ch == 's') {
             client.connect("http://fundgz.1234567.com.cn/js/161725.js");
@@ -57,6 +58,5 @@ int main(int argc, char **argv)
         }
     }
 
-    reactor_stop();
     return 0;
 }

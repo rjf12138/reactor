@@ -15,7 +15,7 @@ NetServer::~NetServer(void)
 }
 
 int 
-NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
+NetServer::start(const std::string &ip, uint16_t port, ptl::ProtocolType type)
 {
     int ret = server_.create_socket(ip, port);
     if (ret < 0) {
@@ -37,7 +37,7 @@ NetServer::start(const std::string &ip, int port, ptl::ProtocolType type)
             handle_.client_func = client_func;
             handle_.client_conn_func = client_conn_func;
 
-            int ret = ReactorManager::instance().get_main_reactor()->add_server_accept(&handle_);
+            ret = ReactorManager::instance().get_main_reactor()->add_server_accept(&handle_);
             if (ret >= 0) {
                 state_ = NetConnectState_Listening;
                 return ret;
@@ -138,7 +138,7 @@ NetServer::handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl, ptl::WebsocketPar
 }
 
 int 
-NetServer::msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, std::string topic)
+NetServer::msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, util::topic_t topic)
 {
     return 0;
 }
@@ -171,7 +171,7 @@ NetServer::client_func(void* arg)
         return nullptr;
     }
 
-    NetServer *server_ptr = (NetServer*)arg;
+    NetServer *server_ptr = reinterpret_cast<NetServer*>(arg);
     int ready_client_sock = 0;
     while (server_ptr->state_ == NetConnectState_Listening) {
         server_ptr->handle_.ready_sock_mutex.lock();
@@ -191,7 +191,7 @@ NetServer::client_func(void* arg)
 
         ByteBuffer &buffer = server_ptr->handle_.client_conn[ready_client_sock]->recv_buffer;
         client_id_t id = server_ptr->handle_.client_conn[ready_client_sock]->client_id;
-        int size = server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->recv(buffer);
+        ssize_t size = server_ptr->handle_.client_conn[ready_client_sock]->socket_ptr->recv(buffer);
         if (size <= 0) {
             continue;
         }
