@@ -24,6 +24,28 @@ extern void set_systemcall_message_output_callback(basic::InfoLevel level, basic
 extern int exe_shell_cmd(std::string &result, const char *format, ...);
 extern int exe_shell_cmd_to_stdin(const char *format, ...);
 
+// 通用的宏工具
+// 检查返回值，如果符合要求则退出函数、退出循环、继续循环、退出switch
+#define RETURN_FUNC_NE(x, y, ret) if ((x) != (y)) { return ret;} else {/*什么都不做*/} // 如果满足x!=y，则退出函数，返回值 ret，否则什么都不做
+#define RETURN_FUNC_EQ(x, y, ret) if ((x) == (y)) { return ret;} else {/*什么都不做*/} // 如果满足x==y，则退出函数，返回值 ret，否则什么都不做
+#define RETURN_FUNC_GT(x, y, ret) if ((x) >= (y)) { return ret;} else {/*什么都不做*/} // 如果满足x >= y，则退出函数，返回值 ret，否则什么都不做
+#define RETURN_FUNC_LT(x, y, ret) if ((x) <= (y)) { return ret;} else {/*什么都不做*/} // 如果满足x <= y，则退出函数，返回值 ret，否则什么都不做
+#define RETURN_FUNC_GR(x, y, ret) if ((x) > (y)) { return ret;} else {/*什么都不做*/}  // 如果满足x > y，则退出函数，返回值 ret，否则什么都不做
+#define RETURN_FUNC_LE(x, y, ret) if ((x) < (y)) { return ret;} else {/*什么都不做*/}  // 如果满足x < y，则退出函数，返回值 ret，否则什么都不做
+
+#define BREAK_FUNC_EQ(x, y) if ((x) == (y)) { break; } else {/*什么都不做*/} // 如果满足x==y，则退出循环，否则什么都不做
+#define BREAK_FUNC_GT(x, y) if ((x) >= (y)) { break; } else {/*什么都不做*/} // 如果满足x >= y，则退出循环，否则什么都不做
+#define BREAK_FUNC_LT(x, y) if ((x) <= (y)) { break; } else {/*什么都不做*/} // 如果满足x <= y，则退出循环，否则什么都不做
+#define BREAK_FUNC_GR(x, y) if ((x) > (y)) { break; } else {/*什么都不做*/} // 如果满足x > y，则退出循环，否则什么都不做
+#define BREAK_FUNC_LE(x, y) if ((x) < (y)) { break; } else {/*什么都不做*/} // 如果满足x < y，则退出循环，否则什么都不做
+
+#define CONTINUE_FUNC_EQ(x, y) if ((x) == (y)) { continue; } else {/*什么都不做*/}  // 如果满足x==y，则继续循环，否则什么都不做
+#define CONTINUE_FUNC_GT(x, y) if ((x) >= (y)) { continue; } else {/*什么都不做*/}  // 如果满足x >= y，则继续循环，否则什么都不做
+#define CONTINUE_FUNC_LT(x, y) if ((x) <= (y)) { continue; } else {/*什么都不做*/}  // 如果满足x <= y，则继续循环，否则什么都不做
+#define CONTINUE_FUNC_GR(x, y) if ((x) > (y)) { continue; } else {/*什么都不做*/}  // 如果满足x > y，则继续循环，否则什么都不做
+#define CONTINUE_FUNC_LE(x, y) if ((x) < (y)) { continue; } else {/*什么都不做*/}  // 如果满足x < y，则继续循环，否则什么都不做
+//
+
 /*
 * 所有的类成员函数成功了返回0， 失败返回非0值
 */
@@ -36,6 +58,7 @@ typedef struct stime {
     uint32_t hours;
     uint32_t mins;
     uint32_t secs;
+    uint32_t wday;
 
     stime(void)
     :year(0),
@@ -43,7 +66,8 @@ typedef struct stime {
     days(0),
     hours(0),
     mins(0),
-    secs(0) {}
+    secs(0),
+    wday(0) {}
 } stime_t;
 
 // 时间转换：默认格式： YY-MM-DD hh:mm:ss:ms
@@ -57,6 +81,8 @@ public:
 
     // 获取当前时间
     static mtime_t now(void);
+    // 获取当前时间
+    static stime_t snow(void);
     // 格式化当前时间
     static std::string format(bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
 
@@ -74,6 +100,8 @@ public:
     static mtime_t convert_to(const std::string &ti, bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
     // 毫秒数转成字符串
     static std::string convert_to(const mtime_t &ti, bool mills_enable = true, const char *fmt = DEFAULT_TIME_FMT);
+    // 将秒数转成结构体
+    static stime_t convert_to(const time_t &ti);
 
 private:
     Time(const Time&) = delete;
@@ -163,6 +191,32 @@ public:
                             : "r" (new_value), "m" (*reg), "0" (old_value)
                             : "cc");
         return old_value == ret;
+    #elif __RJF_WINDOWS__
+    #endif
+    }
+    
+    static uint32_t fetch_and_add(volatile uint32_t *val, uint32_t incr)
+    {
+    #ifdef __RJF_LINUX__
+        unsigned int result = 0;
+        __asm__ volatile ("lock; xadd %0, %1"
+            : "=r" (result), "=m" (*val)
+            : "0" (incr), "m" (*val)
+            : "memory");
+        return result;
+    #elif __RJF_WINDOWS__
+    #endif
+    }
+
+    static unsigned int fetch_and_sub(volatile unsigned int* p, unsigned int decr)
+    {
+    #ifdef __RJF_LINUX__
+        unsigned int result;
+        __asm__ __volatile__ ("lock; xadd %0, %1"
+                :"=r"(result), "=m"(*p)
+                :"0"(-decr), "m"(*p)
+                :"memory");
+        return result;
     #elif __RJF_WINDOWS__
     #endif
     }
@@ -378,6 +432,68 @@ private:
     std::map<thread_id_t, WorkThread*> runing_threads_; // 运行中的线程列表
     std::map<thread_id_t, WorkThread*> idle_threads_; // 空闲的线程列表
 };
+//////////////////////////////// 目录操作 /////////////////////////////////////////////////
+enum EFileType {
+	EFileType_Unknown = -1,
+	EFileType_File,
+	EFileType_Dir,
+	EFileType_Link,
+};
+
+struct SFileType {
+	EFileType type;
+	std::string name;
+	std::string abs_path_;
+};
+
+#define DEFAULT_DIR_RIGHT  (S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
+// 存在问题，要不统一使用绝对路径
+class Directory : public basic::Logger {
+public:
+    Directory(void);
+    ~Directory(void);
+
+    // 获取程序当前运行路径
+    static std::string get_program_running_dir(void);
+    // 修改程序当前的运行路径
+	static int change_program_running_dir(std::string &new_path);
+
+    // 获取当前打开的目录路径
+	std::string get_curr_dir_path(void);
+    // 获取当前打开目录名称
+	std::string get_curr_dir_name(void);
+
+    // 打开目录
+	int open_dir(const std::string &path);
+	std::vector<SFileType> file_list(bool ret_default_dir = false); // 是否返回 . 和 .. 目录
+
+	std::string get_abs_path(const std::string &file_path);// 获取当前打开目录下文件的绝对路径
+
+	// is_abs == true 表示使用绝对路径, is_abs == false 表示使用当前打开目录下。
+    // 指定路径下文件/目录是否存在
+	bool exist(const std::string &file_path, bool is_abs = false);
+    // 指定路径文件的类型
+	EFileType file_type(const std::string  &file_path, bool is_abs = false);
+    // 创建文件或者是目录
+	int create(const std::string &path, EFileType type, uint mode = DEFAULT_DIR_RIGHT, bool is_abs = false);
+    // 删除文件或目录
+	int remove(const std::string &path, bool is_abs = false);
+    // 重命名文件或目录
+	int rename(const std::string &old_name, const std::string &new_name, bool is_abs = false);
+
+	// 拷贝、移动当前目录
+	int copy(const std::string &des_path);
+	int move(const std::string &des_path);
+
+private:
+    Directory(const Directory&) = delete;   // 禁止拷贝
+    Directory& operator=(const Directory&) = delete;
+
+private:
+    DIR* dir_;
+	std::string dir_path_;
+	bool is_open_dir_;
+};
 
 /////////////////////////////// 文件流 ////////////////////////////////////////////////////
 // 修改一下成功返回0，失败返回非0
@@ -429,6 +545,8 @@ public:
     // 格式化写到文件中
     ssize_t write_file_fmt(const char *fmt, ...);
 
+    // 从file中拷贝文件数据到当前文件中
+    ssize_t copy(File &file);
 private:
     File(const File&) = delete;
     File& operator=(const File&) = delete;
