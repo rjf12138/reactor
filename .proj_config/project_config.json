@@ -19,7 +19,7 @@
 	"ExportFile": [
 		"gtest"
 	],
-	"GenerateFileType": "static_lib",
+	"GenerateFileType": "exe",
 	"HeaderFileDirectoryListing": [
 		"./reactor"
 	],

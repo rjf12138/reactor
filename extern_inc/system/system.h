@@ -24,28 +24,6 @@ extern void set_systemcall_message_output_callback(basic::InfoLevel level, basic
 extern int exe_shell_cmd(std::string &result, const char *format, ...);
 extern int exe_shell_cmd_to_stdin(const char *format, ...);
 
-// 通用的宏工具
-// 检查返回值，如果符合要求则退出函数、退出循环、继续循环、退出switch
-#define RETURN_FUNC_NE(x, y, ret) if ((x) != (y)) { return ret;} else {/*什么都不做*/} // 如果满足x!=y，则退出函数，返回值 ret，否则什么都不做
-#define RETURN_FUNC_EQ(x, y, ret) if ((x) == (y)) { return ret;} else {/*什么都不做*/} // 如果满足x==y，则退出函数，返回值 ret，否则什么都不做
-#define RETURN_FUNC_GT(x, y, ret) if ((x) >= (y)) { return ret;} else {/*什么都不做*/} // 如果满足x >= y，则退出函数，返回值 ret，否则什么都不做
-#define RETURN_FUNC_LT(x, y, ret) if ((x) <= (y)) { return ret;} else {/*什么都不做*/} // 如果满足x <= y，则退出函数，返回值 ret，否则什么都不做
-#define RETURN_FUNC_GR(x, y, ret) if ((x) > (y)) { return ret;} else {/*什么都不做*/}  // 如果满足x > y，则退出函数，返回值 ret，否则什么都不做
-#define RETURN_FUNC_LE(x, y, ret) if ((x) < (y)) { return ret;} else {/*什么都不做*/}  // 如果满足x < y，则退出函数，返回值 ret，否则什么都不做
-
-#define BREAK_FUNC_EQ(x, y) if ((x) == (y)) { break; } else {/*什么都不做*/} // 如果满足x==y，则退出循环，否则什么都不做
-#define BREAK_FUNC_GT(x, y) if ((x) >= (y)) { break; } else {/*什么都不做*/} // 如果满足x >= y，则退出循环，否则什么都不做
-#define BREAK_FUNC_LT(x, y) if ((x) <= (y)) { break; } else {/*什么都不做*/} // 如果满足x <= y，则退出循环，否则什么都不做
-#define BREAK_FUNC_GR(x, y) if ((x) > (y)) { break; } else {/*什么都不做*/} // 如果满足x > y，则退出循环，否则什么都不做
-#define BREAK_FUNC_LE(x, y) if ((x) < (y)) { break; } else {/*什么都不做*/} // 如果满足x < y，则退出循环，否则什么都不做
-
-#define CONTINUE_FUNC_EQ(x, y) if ((x) == (y)) { continue; } else {/*什么都不做*/}  // 如果满足x==y，则继续循环，否则什么都不做
-#define CONTINUE_FUNC_GT(x, y) if ((x) >= (y)) { continue; } else {/*什么都不做*/}  // 如果满足x >= y，则继续循环，否则什么都不做
-#define CONTINUE_FUNC_LT(x, y) if ((x) <= (y)) { continue; } else {/*什么都不做*/}  // 如果满足x <= y，则继续循环，否则什么都不做
-#define CONTINUE_FUNC_GR(x, y) if ((x) > (y)) { continue; } else {/*什么都不做*/}  // 如果满足x > y，则继续循环，否则什么都不做
-#define CONTINUE_FUNC_LE(x, y) if ((x) < (y)) { continue; } else {/*什么都不做*/}  // 如果满足x < y，则继续循环，否则什么都不做
-//
-
 /*
 * 所有的类成员函数成功了返回0， 失败返回非0值
 */
@@ -403,12 +381,8 @@ private:
     // 除了工作线程之外，其他任何代码都不要去调用该函数，否则会导致的任务丢失
     int get_task(Task &task);
 
-    // 休眠指定线程
-    int thread_move_to_idle_map(thread_id_t thread_id);
-    // 运行指定线程
-    int wakeup_specify_thread(thread_id_t thread_id);
     // 随机唤醒一个线程
-    std::size_t wakeup_random_thread(std::size_t thread_cnt);
+    void wakeup_random_thread(void);
     // 调整线程数量
     int ajust_threads_num(void);
     
@@ -429,8 +403,7 @@ private:
 
     ds::Queue<Task> tasks_;   // 普通任务队列
     ds::Queue<Task> priority_tasks_; // 优先任务队列
-    std::map<thread_id_t, WorkThread*> runing_threads_; // 运行中的线程列表
-    std::map<thread_id_t, WorkThread*> idle_threads_; // 空闲的线程列表
+    std::map<thread_id_t, WorkThread*> threads_; // 运行中的线程列表
 };
 //////////////////////////////// 目录操作 /////////////////////////////////////////////////
 enum EFileType {
@@ -457,6 +430,8 @@ public:
     static std::string get_program_running_dir(void);
     // 修改程序当前的运行路径
 	static int change_program_running_dir(std::string &new_path);
+    // 获取可执行文件所在目录
+    static std::string get_cur_executable_path(bool exec_file_path = true);
 
     // 获取当前打开的目录路径
 	std::string get_curr_dir_path(void);
