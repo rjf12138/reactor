@@ -7,7 +7,9 @@
 #include "protocol/protocol.h"
 #include "system/system.h"
 #include "util/util.h"
-#include "reactor_define.h"
+
+#include "linux_reactor.h"
+
 
 namespace reactor {
 ///////////////////////// 客户端类 /////////////////////////
@@ -46,28 +48,31 @@ public:
     void set_state(NetConnectState state);
 
     // 发送数据到服务器上
-    ssize_t send_data(const ByteBuffer &buff);
+    ssize_t send_data(ByteBuffer &buff);
 
     // 处理服务器发送的数据
     int handle_msg(basic::ByteBuffer &buffer);
     // 对端连接断开通知
-    virtual int notify_client_disconnected(client_id_t cid);
+    virtual int notify_client_disconnected(sock_id_t cid);
+
     // 进程内消息收到时回调函数
     virtual int msg_handler(util::obj_id_t sender, basic::ByteBuffer &msg, util::topic_t topic);
 
 private:
-    static void* client_func(void* arg);// arg: EventHandle_t
+    static void* client_func(void* arg);
+
 protected:
     std::string url_;
     ptl::URLParser url_parser_;
 
 private:
-    server_id_t sid_;
-    client_id_t cid_;
+    sock_id_t cid_;
     ClientConn_t *client_conn_ptr_;
-    EventHandle_t handle_;
 
     NetConnectState state_;
+
+    MainReactor *main_reactor_ptr_;
+    SubReactor *sub_reactor_ptr_;
 };
 
 class HttpNetClient : public NetClient {
@@ -151,20 +156,20 @@ public:
     // 获取IP信息
     std::string get_ip_info(void);
     // 关闭客户端连接, 参数 cid 可以从 handle_client_conn 中获取
-    int close_client(client_id_t cid);
+    int close_client(sock_id_t cid);
     // 发送数据给客户端
-    ssize_t send_data(client_id_t cid, const ByteBuffer &buff);
+    ssize_t send_data(sock_id_t cid, ByteBuffer &buff);
 
     // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Raw 才会被调用
-    virtual int handle_msg(client_id_t cid, ByteBuffer &buffer);
+    virtual int handle_msg(sock_id_t cid, ByteBuffer &buffer);
     // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Http 才会被调用
-    virtual int handle_msg(client_id_t cid, ptl::HttpPtl &ptl, ptl::HttpParse_ErrorCode err);
+    virtual int handle_msg(sock_id_t cid, ptl::HttpPtl &ptl, ptl::HttpParse_ErrorCode err);
     // 接收客户端的消息，只有 ptl::ProtocolType 指定为 ptl::ProtocolType_Websocket 才会被调用
-    virtual int handle_msg(client_id_t cid, ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
+    virtual int handle_msg(sock_id_t cid, ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
     // 客户端连接到服务器时会调用
-    virtual int handle_client_conn(client_id_t cid);
+    virtual int handle_client_conn(sock_id_t cid);
     // 客户端连接断开时会调用
-    virtual int notify_client_disconnected(client_id_t cid);
+    virtual int notify_client_disconnected(sock_id_t cid);
     // 服务端停止监听时的回调
     virtual int notify_server_stop_listen(void);
 
@@ -173,10 +178,9 @@ public:
 
 private:
     static void* client_func(void* arg); // 处理客户端发过来的数据
-    static void client_conn_func(client_id_t id, void* arg); // 客户端连接时的处理函数
+    static void client_conn_func(sock_id_t id, void* arg); // 客户端连接时的处理函数
 
 private:
-    server_id_t id_;
     EventHandle_t handle_;
 
     ptl::ProtocolType type_;
@@ -184,7 +188,9 @@ private:
 
     NetConnectState state_;
 
-    ptl::HttpPtl http_ptl_;
+    os::Mutex mutex_;
+
+    MainReactor *main_reactor_ptr_;
 };
 }
 

@@ -1,12 +1,10 @@
 #include "reactor.h"
-#include "linux_reactor.h"
 
 namespace reactor {
 
 NetClient::NetClient(void)
 :state_(NetConnectState_Disconnected)
 {
-    sid_ = reinterpret_cast<server_id_t>(this);
 }
 
 NetClient::~NetClient(void)
@@ -42,32 +40,24 @@ NetClient::connect(const std::string &url)
         return -1;
     }
     client_conn_ptr->client_id = client_conn_ptr->socket_ptr->get_socket();
-
-    handle_.exit = false;
-    handle_.server_id = sid_;
-    handle_.acceptor = nullptr;
-    handle_.events = EventType_In | EventType_RDHup | EventType_Err /*| EventType_ET*/;
-    handle_.method = EventMethod_Epoll;
-    
-    handle_.client_arg = this;
-    handle_.client_func = client_func;
-
-    ret = ReactorManager::instance().get_sub_reactor()->server_register(&handle_);
-    if (ret < 0 && ReactorManager::instance().get_sub_reactor_state() == ReactorState_Running) {
-        LOG_WARN("Client register Failed[%s: %d][subReactor: %d]", url_parser_.addr_, url_parser_.port_, ReactorManager::instance().get_sub_reactor_state());
-        delete client_conn_ptr;
-        return -1;
-    }
-
     client_conn_ptr->socket_ptr->setnonblocking();
-    ret = ReactorManager::instance().get_sub_reactor()->add_client_conn(sid_, client_conn_ptr);
+    client_conn_ptr->client_arg = this;
+    client_conn_ptr->client_func = client_func;
+    client_conn_ptr->is_client = true;
+
+    main_reactor_ptr_ = ReactorManager::instance().get_reactor();
+    sub_reactor_ptr_ = main_reactor_ptr_->assign_conn_to_sub_reactor(client_conn_ptr);
+    sub_reactor_ptr_->add_client_conn(client_conn_ptr);
     if (ret < 0) {
         LOG_WARN("Add client connection Failed[%s: %d]", url_parser_.addr_, url_parser_.port_);
         delete client_conn_ptr;
         return -1;
     }
+
+
     cid_ = client_conn_ptr->client_id;
     client_conn_ptr_ = client_conn_ptr;
+
     state_ = NetConnectState_Connected;
 
     return ret;
@@ -76,9 +66,9 @@ NetClient::connect(const std::string &url)
 int 
 NetClient::disconnect(void)
 {
-    if (state_ != NetConnectState_Disconnected && ReactorManager::instance().get_sub_reactor_state() == ReactorState_Running) {
+    if (state_ != NetConnectState_Disconnected && sub_reactor_ptr_->get_state() == ReactorState_Running) {
         client_conn_ptr_ = nullptr;
-        return ReactorManager::instance().get_sub_reactor()->remove_client_conn(sid_, cid_);
+        return sub_reactor_ptr_->remove_client_conn(cid_);
     }
     state_ = NetConnectState_Disconnected;
 
@@ -123,21 +113,14 @@ NetClient::set_state(NetConnectState state)
 }
 
 ssize_t 
-NetClient::send_data(const ByteBuffer &buff)
+NetClient::send_data(ByteBuffer &buff)
 {
     if (state_ == NetConnectState_Disconnected) {
         LOG_WARN("Client not connect any server.");
         return -1;
     }
 
-    ClientConn_t* client_conn_ptr = handle_.client_conn[cid_];
-    client_conn_ptr->buff_mutex.lock();
-    client_conn_ptr->send_buffer += buff;
-    client_conn_ptr->buff_mutex.unlock();
-
-    ReactorManager::instance().get_send_datacenter()->send_data(client_conn_ptr->client_id);
-
-    return buff.data_size();
+    return sub_reactor_ptr_->send_data(cid_, buff);
 }
 
 int 
@@ -147,7 +130,7 @@ NetClient::handle_msg(ByteBuffer &buffer)
 }
 
 int
-NetClient::notify_client_disconnected(client_id_t cid)
+NetClient::notify_client_disconnected(sock_id_t cid)
 {
     return 0;
 }
@@ -166,8 +149,10 @@ NetClient::client_func(void* arg)
     }
 
     ssize_t size = 0;
-    NetClient *client_ptr = reinterpret_cast<NetClient*>(arg);
+    ClientConn_t *connect_ptr = reinterpret_cast<ClientConn_t*>(arg);
+    NetClient *client_ptr = reinterpret_cast<NetClient*>(connect_ptr->client_arg);
     if (client_ptr->get_state() != NetConnectState_Connected) {
+        LOG_GLOBAL_WARN("Client not connect[%s]", connect_ptr->client_id);
         return nullptr;
     }
 
@@ -269,7 +254,6 @@ NetClient::client_func(void* arg)
         LOG_GLOBAL_WARN("Unknown ptl: %d", client_ptr->url_parser_.type_);
     }
 end:
-    client_ptr->handle_.state = EventHandleState_Idle;
 
     return nullptr;
 }

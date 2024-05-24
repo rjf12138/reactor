@@ -19,7 +19,7 @@
 	"ExportFile": [
 		"gtest"
 	],
-	"GenerateFileType": "static_lib",
+	"GenerateFileType": "exe",
 	"HeaderFileDirectoryListing": [
 		"./reactor"
 	],
@@ -44,7 +44,7 @@
 			
 		]
 	},
-	"MainFileName": "http_test.cc",
+	"MainFileName": "tcp_server_test.cc",
 	"Name": "reactor",
 	"Path": "/home/ruanjian/workspace/project_v/reactor",
 	"ProgramRunArgs": "",

@@ -1,7 +1,7 @@
 #ifndef __SUB_REACTOR_H__
 #define __SUB_REACTOR_H__
 
-#include "reactor.h"
+#include "reactor_define.h"
 
 /********************************************************
 * 线程数分配（至少5个线程）：
@@ -13,39 +13,12 @@
 *********************************************************/
 
 namespace reactor {
-enum ReactorState {
-    ReactorState_Running,
-    ReactorState_WaitExit,
-    ReactorState_Exit
-};
-
-///////////////////////////// 发送数据处理 ////////////////////////////////////////////
-class SendDataCenter {
-public:
-    SendDataCenter(void);
-    virtual ~SendDataCenter(void);
-
-    // 向对端发送数据
-    int send_data(client_id_t cid);
-    // 注册发送对象
-    int register_connection(ClientConn_t *client_ptr);
-    // 移除发送对象
-    int remove_connection(client_id_t cid);
-
-private:
-    SendDataCenter(const SendDataCenter&) = delete;
-    SendDataCenter& operator=(const SendDataCenter&) = delete;
-
-    static void* send_loop(void* arg);
-    static void* exit_loop(void* arg);
-
-private:
-    os::Mutex send_mtx_;
-    ds::Queue<client_id_t> send_queue_;
-
-    os::Mutex conn_mtx_;
-    std::map<client_id_t, ClientConn_t*> sender_conns_;
-};
+typedef enum ReactorState {
+    ReactorState_Running,   // 运行
+    ReactorState_WaitExit,  // 等待退出
+    ReactorState_Exit,      // 退出
+    ReactorState_Error,     // 异常
+} ReactorState;
 
 //////////////////////////// 处理客户端的数据 ////////////////////////////////////////////
 class SubReactor : public Logger {
@@ -53,17 +26,25 @@ public:
     SubReactor(int events_max_size_ = 32, int timeout = 3000);
     virtual ~SubReactor(void);
 
-    // 注册服务
-    int server_register(EventHandle_t *handle_ptr);
-    // 添加新的客户端连接
-    int add_client_conn(server_id_t id, ClientConn_t *client_conn_ptr);
-    // 移除客户端连接
-    int remove_client_conn(server_id_t sid, client_id_t cid);
+public:
+    int start(void);
+    int stop(void);
 
+public:
+    // 添加新的客户端连接
+    int add_client_conn(ClientConn_t *client_conn_ptr);
+    // 移除客户端连接
+    int remove_client_conn(sock_id_t cid);
+    // 发送数据
+    ssize_t send_data(sock_id_t cid, ByteBuffer &buffer);
+    // 获取客户端连接数量
+    int get_client_conn_size(void) {return client_conn_.size();}
+    // 运行状态
+    ReactorState get_state(void) {return reactor_state_;}
+
+public:
     // 事件处理函数
     static void* event_wait(void *arg);
-    // 事件退出函数
-    static void* event_exit(void *arg);
 
 private:
     inline EventHandle_t* get_event_handle(int client_sock);
@@ -77,42 +58,62 @@ private:
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
 
-    std::map<int, server_id_t> client_conn_to_;
-    std::map<server_id_t, EventHandle_t*> servers_;
+    os::Mutex mutex_;
+
+    ReactorState reactor_state_;
+    std::map<sock_id_t, ClientConn_t*> client_conn_; // 客户端连接
 };
 
 /////////////////////////// 处理客户端的连接 ///////////////////////////////////////////
 class MainReactor : public Logger {
 public:
-    MainReactor(int events_max_size_ = 32, int timeout = 3000);
+    MainReactor(int sub_reactor_size = 5);
     virtual ~MainReactor(void);
 
+public:
+    // 启动
+    int start(void);
+    // 停止
+    int stop(void);
+
+public:
+    // 获取运行状态
+    ReactorState get_state(void) {return reactor_state_;}
     // 添加服务端监听连接
     int add_server_accept(EventHandle_t *handle_ptr);
     // 删除服务端监听连接
-    int remove_server_accept(server_id_t sid);
+    int remove_server_accept(sock_id_t sid);
     // 移除客户端连接
-    int remove_client_conn(server_id_t sid, client_id_t cid);
+    int remove_client_conn(sock_id_t cid);
+    // 将连接分配到sub reactor上
+    SubReactor * assign_conn_to_sub_reactor(ClientConn_t *conn);
+    // 获取客户端连接所在的sub reactor
+    SubReactor * get_client_sub_reactor(sock_id_t cid);
 
+public: 
     // 事件处理函数
     static void* event_wait(void *arg);
-    // 事件退出函数
-    static void* event_exit(void *arg);
 
 private:
     MainReactor(const MainReactor &) = delete;
     MainReactor& operator=(const MainReactor&) = delete;
 
-    inline EventHandle_t* get_event_handle(int listen_socket_fd);
 private:
     int epfd_;
-    int timeout_;
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
 
+    int sub_reactor_size_;
+
+    ReactorState reactor_state_;
+
     os::Mutex server_ctl_mutex_;
-    std::map<int, server_id_t> server_listen_to_;
-    std::map<server_id_t, EventHandle_t*> acceptor_;
+
+    std::map<sock_id_t, EventHandle_t*> acceptor_;  // 服务端句柄
+    std::set<SubReactor*> set_sub_reactors_;        // subreactor集合
+
+    std::map<sock_id_t, std::set<sock_id_t>> mp_srv_clients_;   // 服务端所对应的客户端连接
+    std::map<sock_id_t, SubReactor*> mp_cli_to_sub_reactor_;    // 客户端所对应的Sub reactor
 };
 
 
@@ -127,17 +128,8 @@ public:
     // 停止Reactor
     int stop(void);
 
-    MainReactor* get_main_reactor(void) {return main_reactor_ptr;}
-    SubReactor* get_sub_reactor(void) {return sub_reactor_ptr;}
-    SendDataCenter *get_send_datacenter(void) {return send_datacenter_ptr;}
-
-    void set_main_reactor_state(ReactorState state) {main_reactor_state_ = state;}
-    void set_sub_reactor_state(ReactorState state) {sub_reactor_state_ = state;}
-    void set_send_datacenter_state(ReactorState state) {send_datacenter_state_ = state;}
-
-    ReactorState get_main_reactor_state(void) {return main_reactor_state_;}
-    ReactorState get_sub_reactor_state(void) {return sub_reactor_state_;}
-    ReactorState get_send_datacenter_state(void) {return send_datacenter_state_;}
+    // 获取reactor运行状态
+    MainReactor* get_reactor(void) {return main_reactor_ptr;}
 
     // 设置线程池配置
     int set_config(const ReactorConfig_t &config);
@@ -161,12 +153,6 @@ private:
     util::Timer timer_;
 
     MainReactor* main_reactor_ptr;
-    SubReactor* sub_reactor_ptr;
-    SendDataCenter *send_datacenter_ptr;
-
-    ReactorState main_reactor_state_;
-    ReactorState sub_reactor_state_;
-    ReactorState send_datacenter_state_;
 };
 }
 #endif

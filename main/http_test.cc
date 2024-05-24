@@ -1,3 +1,6 @@
+/*
+    测试http想http服务器请求数据
+*/
 #include "reactor.h"
 
 using namespace reactor;
@@ -16,7 +19,7 @@ public:
         return 0;
     }
 
-    int notify_client_disconnected(client_id_t cid) {
+    int notify_client_disconnected(sock_id_t cid) {
         LOG_TRACE("client disconnected[cid: %d]", cid);
         return 0;
     }
@@ -39,9 +42,6 @@ private:
 int main(int argc, char **argv)
 {
     ReactorConfig_t rconfig;
-    rconfig.max_wait_task = 10000;
-    rconfig.threads_num = 5;
-    rconfig.send_thread_num = 1;
     reactor_start(rconfig);
 
     TestClient client;

@@ -36,18 +36,27 @@ enum EventHandleState {  // 事件当前状态
     EventHandleState_Handling,  // 正在处理就绪事件
 };
 
-typedef uint32_t client_id_t;
-typedef uint64_t server_id_t;
-typedef struct ClientConn {
-    client_id_t client_id;
-    os::SocketTCP* socket_ptr;
+typedef uint64_t sock_id_t;
+typedef void (*client_conn_func_t)(sock_id_t,void*);
+typedef void* (*handle_func_t)(void *);
 
-    os::Mutex buff_mutex;
-    ByteBuffer send_buffer;
+typedef struct ClientConn {
+    bool is_client;             // 是否是客户端连接，还是服务端接收的连接
+    sock_id_t client_id;        // 连接socketid
+    os::SocketTCP* socket_ptr;  // tcp连接
+
+    // 接收缓存
     ByteBuffer recv_buffer;
+    // 客户端连接时的处理函数
+    void *client_arg;                       // 客户端类 NetClient
+    void *server_arg;                       // 服务器类 NetServer
+    void *connect_arg;                      // 连接类 ClientConn
+    handle_func_t client_func;              // 处理连接发送的数据
+    client_conn_func_t client_conn_func;    // 连接时候调用
     
     ClientConn(void)
-    :socket_ptr(nullptr) {
+    :socket_ptr(nullptr)
+    , is_client(false) {
         socket_ptr = new os::SocketTCP();
     }
 
@@ -59,33 +68,20 @@ typedef struct ClientConn {
     }
 } ClientConn_t;
 
-typedef void (*client_conn_func_t)(client_id_t,void*);
-typedef void* (*handle_func_t)(void *);
 typedef struct EventHandle {
-    bool exit;
-    server_id_t server_id;
     os::SocketTCP *acceptor;    // 监听套接字连接
 
-    os::Mutex client_conn_mutex;
-    std::map<client_id_t, ClientConn_t*> client_conn; // 客户端连接
-
-    os::Mutex ready_sock_mutex;
-    ds::Queue<int> ready_sock;      // 就绪的客户端描述符列表
-
-    EventHandleState state;     // 事件当前状态
-
-    uint32_t events;            // 事件集合
-    EventMethod method;         // 哪中类型的event, 目前只有epoll
+    os::Mutex *mutex;     //互斥锁，防止多线程访问上层服务/客户端资源冲突
 
     // 客户端连接时的处理函数
-    void *client_arg;
+    void *server_arg;                       // 服务器类 NetServer
+    void *connect_arg;
     handle_func_t client_func;
     client_conn_func_t client_conn_func;
-
+    
     EventHandle(void)
     : acceptor(nullptr),
-    state(EventHandleState_Idle),
-    client_arg(nullptr),
+    connect_arg(nullptr),
     client_func(nullptr),
     client_conn_func(nullptr)
     {}
@@ -93,15 +89,11 @@ typedef struct EventHandle {
 
 typedef struct ReactorConfig {
     bool is_start_server;
-    uint32_t threads_num;
-    uint32_t send_thread_num;
-    uint32_t max_wait_task;
+    uint32_t sub_reactor_size_;
 
     ReactorConfig()
     :is_start_server(true),
-    threads_num(5),
-    send_thread_num(1),
-    max_wait_task(10000) {}
+    sub_reactor_size_(5) {}
 } ReactorConfig_t;
 }
 
