@@ -7,18 +7,23 @@ using namespace reactor;
 
 class TestClient : public HttpNetClient {
 public:
-    TestClient(void) 
+    TestClient(int *total_send_count, int* send_count, int *success_count, int* error_count)
+        : success_count_ptr(success_count),
+        error_count_ptr(error_count),
+        send_count_ptr(send_count),
+        total_send_count_ptr(total_send_count)
     {
-        request_buffer.write_string("Request: Hello, world!!!!");
-        response_buffer.write_string("Response: Hello, world!!!!");
+        ptl.set_request(HTTP_METHOD_GET, "/");
+        current_send_count = 1;
 
-        ptl.set_request(HTTP_METHOD_GET, "/Request"); // 服务端返回是 /Response
-        // ptl.set_header_option(HTTP_HEADER_Host, get_ip_info());
-        ptl.set_content(request_buffer);
+        this->request_buffer.clear();
+        for (int j = 0; j < 1000000; ++j) {
+            this->request_buffer.write_int8(rand() % 256);
+        }
     }
     ~TestClient(void) {}
 
-    int handle_msg(ptl::HttpPtl &http_ptl) {
+    int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err) {
         // if (http_ptl.get_header_option(HTTP_HEADER_Host) != get_ip_info()) {
         //     LOG_GLOBAL_WARN("Recv msg[ptl Host: %s, TestClient Host: %s]", http_ptl.get_header_option(HTTP_HEADER_Host).c_str(), get_ip_info().c_str());
         //     return 0;
@@ -29,12 +34,23 @@ public:
             return 0;
         }
 
-        if (http_ptl.get_content() != response_buffer) {
-            LOG_GLOBAL_WARN("Recv msg[ptl content: %s, TestClient content: %s]", http_ptl.get_content().str().c_str(), response_buffer.str().c_str());
-            return 0;
+        if (http_ptl.get_content() != request_buffer) {
+            LOG_GLOBAL_WARN("Recv msg[ptl content: %s, TestClient content: %s]", http_ptl.get_content().str().c_str(), request_buffer.data_size() > 0 ? request_buffer.str().c_str() : "");
+            ++(*error_count_ptr);
+        } else {
+            LOG_GLOBAL_INFO("Successfully receive server response[%ld]", os::Time::now());
+            ++(*success_count_ptr);
         }
-        LOG_GLOBAL_INFO("Successfully receive server response[%ld]", os::Time::now());
+        this->disconnect();
 
+        if (current_send_count < *total_send_count_ptr) {
+            while (this->get_state() == NetConnectState_Connected) {
+                ;
+            }
+            this->connect("http://127.0.0.1:12138");
+            this->send_msg();
+            ++current_send_count;
+        }
         return 0;
     }
 
@@ -43,20 +59,18 @@ public:
         return 0;
     }
 
-    static void* send_timer_task(void *arg) {
-        if (arg == nullptr) {
-            LOG_GLOBAL_WARN("arg is nullptr");
-            return nullptr;
-        }
+    void send_msg(void) {
+        this->ptl.set_content(this->request_buffer);
+        this->send_data(this->ptl);
 
-        TestClient* client_ptr = static_cast<TestClient*>(arg);
-        os::Time time_x;
-        client_ptr->ptl.set_header_option("SendStartTime", time_x.format());
-        client_ptr->send_data(client_ptr->ptl);
-
-        return nullptr;
+        return ;
     }
 private:
+    int *send_count_ptr;
+    int *total_send_count_ptr;
+    int *success_count_ptr;
+    int *error_count_ptr;
+    int current_send_count;
     ptl::HttpPtl ptl;
     ByteBuffer request_buffer;
     ByteBuffer response_buffer;
@@ -67,32 +81,45 @@ int main(int argc, char **argv)
     ReactorConfig_t rconfig;
     reactor_start(rconfig);
 
-    TestClient client;
-    client.connect("http://192.168.0.103:12138");
+    int send_msg_count = 2;
+    int client_count = 1000;
 
-    uint32_t send_gap = 50; // 单位：ms
-    uint64_t send_size = 100;
-    uint64_t send_counts = 80000;
-    std::string str;
-    for (int i = 0; i < send_size; ++i) {
-        str += 'H';
+    int send_count = 0;
+    int success_count = 0;
+    int error_count = 0;
+    std::set<TestClient*> set_clients;
+    for (int i = 0; i < client_count; ++i) {
+        TestClient *client_ptr = new TestClient(&send_msg_count, &send_count, &success_count, &error_count);
+        set_clients.insert(client_ptr);
     }
-    basic::ByteBuffer buffer(str);
+
+    for (auto iter = set_clients.begin(); iter != set_clients.end(); ++iter) {
+        while ((*iter)->get_state() == NetConnectState_Connected) {
+            (*iter)->disconnect();
+        }
+
+        if ((*iter)->get_state() == NetConnectState_Disconnected) {
+            (*iter)->connect("http://127.0.0.1:12138");
+        }
+        (*iter)->send_msg();
+    }
+
+    fprintf(stdout, "Press 'q' to stop and show result\n"
+    );
 
     while (true) {
         char ch = getchar();
         if (ch == 'q') {
             break;
-        } else if (ch == 's') {
-            util::TimerEvent_t event;
-            event.attr = util::TimerEventAttr_ReAdd;
-            event.wait_time = send_gap;
-            event.TimeEvent_callback = TestClient::send_timer_task;
-            event.TimeEvent_arg = &client;
-
-            client.add_timer_task(event);
         }
     }
+
+    fprintf(stdout, "total_count: %d, send_count: %d, success_recv: %d, failed_recv: %d\n",
+        send_msg_count * client_count,
+        send_count,
+        success_count,
+        error_count
+    );
 
     reactor_stop();
     return 0;

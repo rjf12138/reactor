@@ -171,7 +171,9 @@ NetServer::client_func(void* arg)
     NetServer *server_ptr = reinterpret_cast<NetServer*>(conn_ptr->server_arg);
     int ready_client_sock = 0;
     if (server_ptr->state_ == NetConnectState_Listening) {
+        LOG_GLOBAL_DEBUG("http1: %d\n", conn_ptr->recv_buffer.data_size());
         ssize_t size = conn_ptr->socket_ptr->recv(conn_ptr->recv_buffer);
+        LOG_GLOBAL_DEBUG("http2: %d\n", conn_ptr->recv_buffer.data_size());
         if (size <= 0) {
             return nullptr;
         }
@@ -186,14 +188,14 @@ NetServer::client_func(void* arg)
             ptl::HttpParse_ErrorCode err;
             ptl::HttpPtl http_ptl;
             do {
-                //LOG_GLOBAL_DEBUG("http:\n%s", conn_ptr->recv_buffer.str().c_str());
+                LOG_GLOBAL_DEBUG("http: %d\n%s", conn_ptr->recv_buffer.data_size(), conn_ptr->recv_buffer.str().c_str());
                 err = http_ptl.parse(conn_ptr->recv_buffer);
                 if (err == ptl::HttpParse_OK) {
                     server_ptr->mutex_.lock();
                     server_ptr->handle_msg(id, http_ptl, ptl::HttpParse_OK);
                     server_ptr->mutex_.unlock();
-                    http_ptl.clear();
-                    server_ptr->close_client(id);
+                    LOG_GLOBAL_INFO("Parse client send data success[PTL: HTTP, client: %s]", 
+                            conn_ptr->socket_ptr->get_ip_info().c_str());
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, client: %s]", 
@@ -201,7 +203,6 @@ NetServer::client_func(void* arg)
                     server_ptr->mutex_.lock();
                     server_ptr->handle_msg(id, http_ptl, err);
                     server_ptr->mutex_.unlock();
-                    http_ptl.clear();
                     server_ptr->close_client(id); // http数据处理完成后关闭连接
                 } else {
                     if (http_ptl.is_tranfer_encode()) {

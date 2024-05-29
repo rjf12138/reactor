@@ -5,29 +5,20 @@ using namespace reactor;
 class TestServer : public NetServer {
 public:
     TestServer(void) {
-        request_buffer.write_string("Request: Hello, world!!!!");
-        response_buffer.write_string("Response: Hello, world!!!!");
-
         ptl_.set_response(HTTP_STATUS_OK, "OK");
-        // ptl_.set_header_option(HTTP_HEADER_Host, get_ip_info());
-        ptl_.set_content(response_buffer);
     }
 
     ~TestServer(void) 
     {}
 
     virtual int handle_msg(sock_id_t cid, ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err) {
+        ptl_.set_content(http_ptl.get_content());
+
         ByteBuffer buffer;
         ptl_.generate(buffer);
-        os::Time time_x;
-        ptl_.set_header_option("ResponseTime", time_x.format());
-        ptl_.set_header_option("SendStartTime", http_ptl.get_header_option("SendStartTime"));
-
-        ptl_.set_content(response_buffer);
-
-        this->send_data(cid, buffer);
 
         LOG_GLOBAL_INFO("Response: %s", buffer.str().c_str());
+        this->send_data(cid, buffer);
 
         return 0;
     }
@@ -45,8 +36,6 @@ public:
 private:
     uint64_t recv_size = 0;
     ptl::HttpPtl ptl_;
-    ByteBuffer request_buffer;
-    ByteBuffer response_buffer;
 };
 
 int main(int argc, char **argv)

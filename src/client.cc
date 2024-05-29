@@ -174,27 +174,36 @@ NetClient::client_func(void* arg)
     }
 
     if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Tcp) {
+        client_ptr->mutex_.lock();
         client_ptr->handle_msg(buffer);
+        client_ptr->mutex_.unlock();
         buffer.clear();
     } else if (client_ptr->url_parser_.type_ == ptl::ProtocolType_Http) {
         ptl::HttpParse_ErrorCode err;
+        ptl::HttpPtl http_ptl;
         HttpNetClient* http_client_ptr = dynamic_cast<HttpNetClient*>(client_ptr);
 
         do {
             try {
-                err = http_client_ptr->http_ptl_.parse(buffer);
+                err = http_ptl.parse(buffer);
                 if (err == ptl::HttpParse_OK) {
-                    http_client_ptr->handle_msg(http_client_ptr->http_ptl_, ptl::HttpParse_OK);
-                    http_client_ptr->http_ptl_.clear();
+                    http_client_ptr->mutex_.lock();
+                    http_client_ptr->handle_msg(http_ptl, ptl::HttpParse_OK);
+                    http_client_ptr->mutex_.unlock();
+                    http_ptl.clear();
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
-                    http_client_ptr->handle_msg(http_client_ptr->http_ptl_, err);
+                    http_client_ptr->mutex_.lock();
+                    http_client_ptr->handle_msg(http_ptl, err);
+                    http_client_ptr->mutex_.unlock();
                     http_client_ptr->disconnect();
                 } else {
-                    if (http_client_ptr->http_ptl_.is_tranfer_encode()) {
-                        http_client_ptr->handle_msg(http_client_ptr->http_ptl_, err);
+                    if (http_ptl.is_tranfer_encode()) {
+                        http_client_ptr->mutex_.lock();
+                        http_client_ptr->handle_msg(http_ptl, err);
+                        http_client_ptr->mutex_.unlock();
                     }
                 }
             } catch (std::runtime_error &runtime_err) {
@@ -236,13 +245,17 @@ NetClient::client_func(void* arg)
             do {
                 ws_err = ws_ptl.parse(buffer);
                 if (ws_err == ptl::WebsocketParse_OK) {
+                    ws_client_ptr->mutex_.lock();
                     ws_client_ptr->handle_msg(ws_ptl, ptl::WebsocketParse_OK);
+                    ws_client_ptr->mutex_.unlock();
                     ws_ptl.clear();
                 } else if (ws_err != ptl::WebsocketParse_PacketNotEnough) {
                     // 协议解析错误时，断开连接
                     LOG_GLOBAL_WARN("Parse data failed[PTL: Websocket, server: %s]", 
                             socket_ptr->get_ip_info().c_str());
+                    ws_client_ptr->mutex_.lock();
                     ws_client_ptr->handle_msg(ws_ptl, ws_err);
+                    ws_client_ptr->mutex_.unlock();
                     ws_client_ptr->disconnect();
                 }
             } while (ws_err == ptl::WebsocketParse_OK);
@@ -297,7 +310,7 @@ HttpNetClient::send_data(ptl::HttpPtl &http_ptl)
 {
     basic::ByteBuffer buffer;
     http_ptl.generate(buffer);
-
+    LOG_GLOBAL_INFO("Send data size: %d", buffer.data_size());
     return NetClient::send_data(buffer);
 }
 

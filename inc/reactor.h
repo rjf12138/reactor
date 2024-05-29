@@ -64,6 +64,7 @@ private:
 protected:
     std::string url_;
     ptl::URLParser url_parser_;
+    os::Mutex mutex_;
 
 private:
     sock_id_t cid_;
@@ -94,9 +95,6 @@ public:
     ssize_t send_data(ptl::HttpPtl &http_ptl);
     // 接收服务端消息
     virtual int handle_msg(ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err);
-
-public:
-    ptl::HttpPtl http_ptl_;
 };
 
 class WSNetClient : public NetClient {

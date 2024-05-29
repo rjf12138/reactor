@@ -93,6 +93,8 @@ public:
 public: 
     // 事件处理函数
     static void* event_wait(void *arg);
+    // 打印连接信息
+    static void* show_connect_info(void *arg);
 
 private:
     MainReactor(const MainReactor &) = delete;
@@ -107,13 +109,12 @@ private:
 
     ReactorState reactor_state_;
 
-    os::Mutex server_ctl_mutex_;
-
     std::map<sock_id_t, EventHandle_t*> acceptor_;  // 服务端句柄
     std::set<SubReactor*> set_sub_reactors_;        // subreactor集合
 
     std::map<sock_id_t, std::set<sock_id_t>> mp_srv_clients_;   // 服务端所对应的客户端连接
     std::map<sock_id_t, SubReactor*> mp_cli_to_sub_reactor_;    // 客户端所对应的Sub reactor
+
 };
 
 

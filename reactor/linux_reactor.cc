@@ -3,41 +3,6 @@
 
 namespace reactor {
 
-#define CONVERT_TYPE(src, dst, x, y) \
-{\
-if (src & x) {\
-    dst |= y;\
-}\
-}
-
-struct epoll_event 
-std_to_epoll_events(uint32_t type)
-{
-    struct epoll_event event = {0, 0};
-    CONVERT_TYPE(type, event.events, EventType_In, EPOLLIN);
-    CONVERT_TYPE(type, event.events, EventType_Pri, EPOLLPRI);
-    CONVERT_TYPE(type, event.events, EventType_Out, EPOLLOUT);
-    CONVERT_TYPE(type, event.events, EventType_RDHup, EPOLLRDHUP);
-    CONVERT_TYPE(type, event.events, EventType_Err, EPOLLERR);
-    CONVERT_TYPE(type, event.events, EventType_Hup, EPOLLHUP);
-    CONVERT_TYPE(type, event.events, EventType_ET, EPOLLET);
-
-    return event;
-}
-
-uint32_t
-epoll_events_to_std(uint32_t events)
-{
-    uint32_t std_events = 0;
-    CONVERT_TYPE(events, std_events, EPOLLIN, EventType_In);
-    CONVERT_TYPE(events, std_events, EPOLLPRI, EventType_Pri);
-    CONVERT_TYPE(events, std_events, EPOLLOUT, EventType_Out);
-    CONVERT_TYPE(events, std_events, EPOLLRDHUP, EventType_RDHup);
-    CONVERT_TYPE(events, std_events, EPOLLERR, EventType_Err);
-    CONVERT_TYPE(events, std_events, EPOLLHUP, EventType_Hup);
-
-    return std_events;
-}
 //////////////////////////////////////////////////////////////////////////////////////////
 ReactorManager& 
 ReactorManager::instance(void)
@@ -91,7 +56,7 @@ ReactorManager::set_config(const ReactorConfig_t &config)
         return -1;
     }
     os::ThreadPoolConfig threadpool_config = thread_pool_.get_threadpool_config();
-    threadpool_config.threads_num = config.sub_reactor_size_ + 1;
+    threadpool_config.threads_num = config.sub_reactor_size_ + 4;
     threadpool_config.max_waiting_task = 10000;
     thread_pool_.set_threadpool_config(threadpool_config);
 
@@ -212,8 +177,8 @@ SubReactor::remove_client_conn(sock_id_t cid)
         return -1;
     }
 
-    ClientConn_t *del_conn_ptr = client_iter->second;
     mutex_.lock();
+    ClientConn_t *del_conn_ptr = client_iter->second;
     client_conn_.erase(client_iter);
     mutex_.unlock();
 
@@ -235,6 +200,7 @@ SubReactor::remove_client_conn(sock_id_t cid)
         connect_ptr->notify_client_disconnected(cid);
     }
 
+    LOG_GLOBAL_INFO("Client[%s] closed, remove client", del_conn_ptr->socket_ptr->get_ip_info().c_str());
     delete del_conn_ptr;                // 销毁ClientConn_t时会自动关闭连接
 
     return 0;
@@ -243,13 +209,17 @@ SubReactor::remove_client_conn(sock_id_t cid)
 ssize_t 
 SubReactor::send_data(sock_id_t cid, ByteBuffer &buffer)
 {
+    mutex_.lock();
     auto iter = client_conn_.find(cid);
     if (iter == client_conn_.end()) {
         LOG_GLOBAL_WARN("Send data failed[Can't find cid: %d]", cid);
+        mutex_.unlock();
         return -1;
     }
 
-    return iter->second->socket_ptr->send(buffer);
+    ssize_t ret = iter->second->socket_ptr->send(buffer);
+    mutex_.unlock();
+    return ret;
 }
 
 void* 
@@ -273,22 +243,23 @@ SubReactor::event_wait(void *arg)
         for (int i = 0; i < ret; ++i) {
             int ready_socket_fd = sub_reactor_ptr->events_[i].data.fd;
 
-            auto conn_iter = sub_reactor_ptr->client_conn_.find(ready_socket_fd);
-            if (conn_iter == sub_reactor_ptr->client_conn_.end()) {
-                LOG_GLOBAL_WARN("Client[%d] conn not found", ready_socket_fd);
+            if (sub_reactor_ptr->events_[i].events & EPOLLRDHUP || sub_reactor_ptr->events_[i].events & EPOLLERR) {
+                sub_reactor_ptr->remove_client_conn(ready_socket_fd);
                 continue;
             }
 
-            ClientConn_t *conn_ptr = conn_iter->second;
-            if (sub_reactor_ptr->events_[i].events & EPOLLRDHUP) {
-                LOG_GLOBAL_INFO("Client[%s] closed, remove client", conn_ptr->socket_ptr->get_ip_info().c_str());
-                sub_reactor_ptr->remove_client_conn(conn_ptr->client_id);
-            } else if (sub_reactor_ptr->events_[i].events & EPOLLERR) {
-                LOG_GLOBAL_WARN("Client[%s] Error, remove client", conn_ptr->socket_ptr->get_ip_info().c_str());
-                sub_reactor_ptr->remove_client_conn(conn_ptr->client_id);
-            } else if (sub_reactor_ptr->events_[i].events & EPOLLHUP) {
-                LOG_GLOBAL_INFO("Client[%s] closed read", conn_ptr->socket_ptr->get_ip_info().c_str());
+            if (sub_reactor_ptr->events_[i].events & EPOLLHUP) {
+                LOG_GLOBAL_INFO("Client[%d] closed read", ready_socket_fd);
             } else if (sub_reactor_ptr->events_[i].events & EPOLLIN) {
+                sub_reactor_ptr->mutex_.lock();
+                auto conn_iter = sub_reactor_ptr->client_conn_.find(ready_socket_fd);
+                if (conn_iter == sub_reactor_ptr->client_conn_.end()) {
+                    LOG_GLOBAL_WARN("Client[%d] conn not found", ready_socket_fd);
+                    sub_reactor_ptr->mutex_.unlock();
+                    continue;
+                }
+                ClientConn_t *conn_ptr = conn_iter->second;
+                sub_reactor_ptr->mutex_.unlock();
                 conn_ptr->client_func(conn_ptr);
             }
         }
@@ -310,6 +281,7 @@ MainReactor::MainReactor(int sub_reactor_size)
     if (epfd_ == -1) {
         LOG_ERROR("epoll_create: %s", strerror(errno));
     }
+
 }
 
 MainReactor::~MainReactor(void)
@@ -333,6 +305,12 @@ MainReactor::start(void)
     task.thread_arg = this;
 
     int ret = ReactorManager::instance().add_task(task);
+
+    os::Task show_task;
+    task.work_func = MainReactor::show_connect_info;
+    task.thread_arg = this;
+
+    ret = ReactorManager::instance().add_task(task);
 
     return ret;
 }
@@ -381,9 +359,7 @@ MainReactor::add_server_accept(EventHandle_t *handle_ptr)
     }
 
     // 清空旧的数据
-    server_ctl_mutex_.lock();
     mp_srv_clients_[handle_ptr->acceptor->get_socket()].clear();
-    server_ctl_mutex_.unlock();
 
     struct epoll_event ep_events;
     memset(&ep_events, 0, sizeof(epoll_event));
@@ -413,7 +389,6 @@ MainReactor::remove_server_accept(sock_id_t sid)
     // 关闭服务端端口监听
     // 1. 关闭已经存在的所有客户端连接
     // 2. 关闭监听端口
-    server_ctl_mutex_.lock();
     for (auto client_iter = mp_srv_clients_[sid].begin(); client_iter != mp_srv_clients_[sid].end(); ++client_iter) {
         this->remove_client_conn(*client_iter);
     }
@@ -424,7 +399,6 @@ MainReactor::remove_server_accept(sock_id_t sid)
     connect_ptr->notify_server_stop_listen();
 
     acceptor_.erase(accept_iter);
-    server_ctl_mutex_.unlock();
 
     return 0;
 }
@@ -523,7 +497,7 @@ MainReactor::event_wait(void *arg)
                     delete client_conn_ptr;
                     continue;
                 }
-
+                
                 main_reactor_ptr->mp_cli_to_sub_reactor_[client_sock_fd] = sub_reactor_ptr;
 
                 LOG_GLOBAL_INFO("Server add client[%s]", client_conn_ptr->socket_ptr->get_ip_info().c_str());
@@ -536,6 +510,30 @@ MainReactor::event_wait(void *arg)
 
     main_reactor_ptr->reactor_state_ = ReactorState_Exit;
     
+    return nullptr;
+}
+
+void* 
+MainReactor::show_connect_info(void *arg)
+{
+    if (arg == nullptr) {
+        LOG_GLOBAL_ERROR("arg is nullptr");
+        return nullptr;
+    }
+
+    MainReactor *main_reactor_ptr = reinterpret_cast<MainReactor*>(arg);
+    
+    while (main_reactor_ptr->reactor_state_ == ReactorState_Running) {
+        fprintf(stdout, "==========================================================\n");
+        fprintf(stdout, "MainReactor: %ld\n", main_reactor_ptr->acceptor_.size());
+        int index = 0;
+        for (auto iter = main_reactor_ptr->set_sub_reactors_.begin(); iter != main_reactor_ptr->set_sub_reactors_.end(); ++iter) {
+            fprintf(stdout, "SubReactor-%d: %d\n", ++index, (*iter)->get_client_conn_size());
+        }
+        fprintf(stdout, "==========================================================\n");
+        os::Time::sleep(2000);
+    }
+
     return nullptr;
 }
 
