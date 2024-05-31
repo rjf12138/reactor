@@ -34,7 +34,8 @@ public:
             return 0;
         }
 
-        if (http_ptl.get_content() != request_buffer) {
+        std::string ret_time = http_ptl.get_header_option("Time");
+        if (http_ptl.get_content() != request_buffer || ret_time != send_time) {
             LOG_GLOBAL_WARN("Recv msg[ptl content: %s, TestClient content: %s]", http_ptl.get_content().str().c_str(), request_buffer.data_size() > 0 ? request_buffer.str().c_str() : "");
             ++(*error_count_ptr);
         } else {
@@ -47,7 +48,7 @@ public:
             while (this->get_state() == NetConnectState_Connected) {
                 ;
             }
-            this->connect("http://127.0.0.1:12138");
+            this->connect("http://127.0.0.1:12138"); 
             this->send_msg();
             ++current_send_count;
         }
@@ -60,7 +61,9 @@ public:
     }
 
     void send_msg(void) {
-        this->ptl.set_content(this->request_buffer);
+        send_time = os::Time::format();
+        ptl.set_header_option("Time", send_time);
+        ptl.set_content(this->request_buffer);
         this->send_data(this->ptl);
 
         return ;
@@ -74,24 +77,34 @@ private:
     ptl::HttpPtl ptl;
     ByteBuffer request_buffer;
     ByteBuffer response_buffer;
+    std::string send_time;
 };
 
 int main(int argc, char **argv)
 {
     ReactorConfig_t rconfig;
+    rconfig.sub_reactor_size_ = 200;
+    rconfig.main_reactor_max_events_size_ = 200;
+    rconfig.sub_reactor_max_events_size_ = 200;
     reactor_start(rconfig);
 
-    int send_msg_count = 2;
-    int client_count = 1000;
+    int send_msg_count = 10;
+    int client_count = 100;
 
     int send_count = 0;
     int success_count = 0;
     int error_count = 0;
     std::set<TestClient*> set_clients;
+    os::mtime_t start_time = os::Time::now();
     for (int i = 0; i < client_count; ++i) {
         TestClient *client_ptr = new TestClient(&send_msg_count, &send_count, &success_count, &error_count);
         set_clients.insert(client_ptr);
     }
+    os::mtime_t end_time = os::Time::now();
+    LOG_GLOBAL_INFO("spend_time: %lld", end_time - start_time);
+
+    int start_port = 12138;
+    int server_max_count = 100;
 
     for (auto iter = set_clients.begin(); iter != set_clients.end(); ++iter) {
         while ((*iter)->get_state() == NetConnectState_Connected) {
@@ -99,7 +112,9 @@ int main(int argc, char **argv)
         }
 
         if ((*iter)->get_state() == NetConnectState_Disconnected) {
-            (*iter)->connect("http://127.0.0.1:12138");
+            char buffer[256] = {0};
+            snprintf(buffer, 255, "http://127.0.0.1:%d", start_port + rand() % 100);
+            (*iter)->connect(buffer);
         }
         (*iter)->send_msg();
     }

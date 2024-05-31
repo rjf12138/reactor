@@ -90,10 +90,14 @@ typedef struct EventHandle {
 typedef struct ReactorConfig {
     bool is_start_server;
     uint32_t sub_reactor_size_;
+    uint32_t main_reactor_max_events_size_;
+    uint32_t sub_reactor_max_events_size_;
 
     ReactorConfig()
     :is_start_server(true),
-    sub_reactor_size_(5) {}
+    sub_reactor_size_(5),
+    main_reactor_max_events_size_(32),
+    sub_reactor_max_events_size_(32) {}
 } ReactorConfig_t;
 }
 

@@ -13,6 +13,7 @@ public:
 
     virtual int handle_msg(sock_id_t cid, ptl::HttpPtl &http_ptl, ptl::HttpParse_ErrorCode err) {
         ptl_.set_content(http_ptl.get_content());
+        ptl_.set_header_option("Time", http_ptl.get_header_option("Time"));
 
         ByteBuffer buffer;
         ptl_.generate(buffer);
@@ -41,10 +42,21 @@ private:
 int main(int argc, char **argv)
 {
     ReactorConfig_t rconfig;
+    rconfig.sub_reactor_size_ = 14;
+    rconfig.main_reactor_max_events_size_ = 2000;
+    rconfig.sub_reactor_max_events_size_ = 10;
     reactor_start(rconfig);
 
-    TestServer server;
-    server.start("127.0.0.1", 12138, ptl::ProtocolType_Http);
+    int start_port = 12138;
+    int server_count = 100;
+
+    std::set<TestServer*> set_servers;
+    for (int i = start_port; i <= start_port + server_count; ++i) {
+        TestServer *server_ptr = new TestServer();
+        set_servers.insert(server_ptr);
+
+        server_ptr->start("127.0.0.1", i, ptl::ProtocolType_Http); 
+    }
 
     while (true) {
         char ch = getchar();

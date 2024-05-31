@@ -24,7 +24,7 @@ ReactorManager::start(const ReactorConfig_t &config)
     this->set_config(config);
 
     if (main_reactor_ptr == nullptr && config.is_start_server == true) {
-        main_reactor_ptr = new MainReactor();
+        main_reactor_ptr = new MainReactor(config.sub_reactor_size_);
         main_reactor_ptr->start();
     } else {
         LOG_GLOBAL_INFO("main reactor is already running or config start server is set false[%s]!", config.is_start_server ? "true":"false");
@@ -82,12 +82,11 @@ ReactorManager::cancel_timer(int timer_id)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-SubReactor::SubReactor(int events_max_size, int timeout)
-:   timeout_(timeout),
-    events_max_size_(events_max_size),
+SubReactor::SubReactor(int events_max_size)
+:  events_max_size_(events_max_size),
     reactor_state_(ReactorState_Exit)
 {
-    events_max_size_ = 32;
+    events_max_size_ = events_max_size_ < 32 ? 32 : events_max_size_;
     events_ = new epoll_event[events_max_size_];
 
     epfd_ = epoll_create(5);
@@ -232,7 +231,7 @@ SubReactor::event_wait(void *arg)
 
     SubReactor *sub_reactor_ptr = reinterpret_cast<SubReactor*>(arg);
     while (sub_reactor_ptr->reactor_state_ == ReactorState_Running) {
-        int ret = ::epoll_wait(sub_reactor_ptr->epfd_, sub_reactor_ptr->events_, sub_reactor_ptr->events_max_size_, 1000);
+        int ret = ::epoll_wait(sub_reactor_ptr->epfd_, sub_reactor_ptr->events_, sub_reactor_ptr->events_max_size_, 300);
         if (ret < 0 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
             return nullptr;
@@ -270,12 +269,13 @@ SubReactor::event_wait(void *arg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-MainReactor::MainReactor(int sub_reactor_size)
+MainReactor::MainReactor(int sub_reactor_size, int main_events_max_size, int sub_events_max_size)
 :   sub_reactor_size_(sub_reactor_size),
+    main_events_max_size_(main_events_max_size),
     reactor_state_(ReactorState_Exit)
 {
-    events_max_size_ = 32;
-    events_ = new epoll_event[events_max_size_];
+    main_events_max_size_ = main_events_max_size_ < 32 ? 32 : main_events_max_size;
+    events_ = new epoll_event[main_events_max_size_];
 
     epfd_ = epoll_create(5);
     if (epfd_ == -1) {
@@ -293,7 +293,7 @@ int
 MainReactor::start(void)
 {
     for (int i = 0; i < sub_reactor_size_; ++i) {
-        SubReactor *sub_reactor_ptr = new SubReactor();
+        SubReactor *sub_reactor_ptr = new SubReactor(sub_reactor_size_);
         set_sub_reactors_.insert(sub_reactor_ptr);
         sub_reactor_ptr->start();
     }
@@ -306,11 +306,11 @@ MainReactor::start(void)
 
     int ret = ReactorManager::instance().add_task(task);
 
-    os::Task show_task;
-    task.work_func = MainReactor::show_connect_info;
-    task.thread_arg = this;
+    // os::Task show_task;
+    // task.work_func = MainReactor::show_connect_info;
+    // task.thread_arg = this;
 
-    ret = ReactorManager::instance().add_task(task);
+    // ret = ReactorManager::instance().add_task(task);
 
     return ret;
 }
@@ -454,7 +454,7 @@ MainReactor::event_wait(void *arg)
 
     MainReactor *main_reactor_ptr = reinterpret_cast<MainReactor*>(arg);
     while (main_reactor_ptr->reactor_state_ == ReactorState_Running) {
-        int event_ret = ::epoll_wait(main_reactor_ptr->epfd_, main_reactor_ptr->events_, main_reactor_ptr->events_max_size_, 1000);
+        int event_ret = ::epoll_wait(main_reactor_ptr->epfd_, main_reactor_ptr->events_, main_reactor_ptr->main_events_max_size_, 300);
         if (event_ret < 0 && errno != EINTR) {
             LOG_GLOBAL_ERROR("epoll_wait: %s", strerror(errno));
             return nullptr;

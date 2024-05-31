@@ -23,7 +23,7 @@ typedef enum ReactorState {
 //////////////////////////// 处理客户端的数据 ////////////////////////////////////////////
 class SubReactor : public Logger {
 public:
-    SubReactor(int events_max_size_ = 32, int timeout = 3000);
+    SubReactor(int events_max_size_ = 32);
     virtual ~SubReactor(void);
 
 public:
@@ -54,7 +54,6 @@ private:
 
 private:
     int epfd_;
-    int timeout_;
     int events_max_size_;   // 一次最多返回的触发事件
     struct epoll_event *events_;
 
@@ -67,7 +66,7 @@ private:
 /////////////////////////// 处理客户端的连接 ///////////////////////////////////////////
 class MainReactor : public Logger {
 public:
-    MainReactor(int sub_reactor_size = 5);
+    MainReactor(int sub_reactor_size = 5, int main_events_max_size = 32, int sub_events_max_size = 32);
     virtual ~MainReactor(void);
 
 public:
@@ -102,7 +101,8 @@ private:
 
 private:
     int epfd_;
-    int events_max_size_;   // 一次最多返回的触发事件
+    int main_events_max_size_;   // 一次最多返回的触发事件
+    int sub_events_max_size_;    // 一次最多返回的触发事件
     struct epoll_event *events_;
 
     int sub_reactor_size_;
