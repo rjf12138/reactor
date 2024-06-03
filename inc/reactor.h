@@ -8,8 +8,8 @@
 #include "system/system.h"
 #include "util/util.h"
 
+#include "reactor_define.h"
 #include "linux_reactor.h"
-
 
 namespace reactor {
 ///////////////////////// 客户端类 /////////////////////////

@@ -23,9 +23,9 @@ NetServer::start(const std::string &ip, uint16_t port, ptl::ProtocolType type)
     
 
     main_reactor_ptr_ = ReactorManager::instance().get_reactor();
-    if (server_.listen() >= 0 &&
-        server_.setnonblocking() >= 0 &&
-        server_.set_reuse_addr() >= 0 && 
+    if (server_.setnonblocking() >= 0 &&
+        server_.set_reuse_addr() >= 0 &&
+        server_.listen() >= 0 && 
         main_reactor_ptr_->get_state() == ReactorState_Running) {
             type_ = type;
             handle_.acceptor = &server_;
