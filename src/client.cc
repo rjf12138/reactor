@@ -182,7 +182,7 @@ NetClient::client_func(void* arg)
         ptl::HttpParse_ErrorCode err;
         ptl::HttpPtl http_ptl;
         HttpNetClient* http_client_ptr = dynamic_cast<HttpNetClient*>(client_ptr);
-
+        LOG_GLOBAL_INFO("RECV:\n%s", buffer.str().c_str());
         do {
             try {
                 err = http_ptl.parse(buffer);
@@ -193,8 +193,8 @@ NetClient::client_func(void* arg)
                     http_ptl.clear();
                 } else if (err != ptl::HttpParse_ContentNotEnough) {
                     // 协议解析错误时，断开连接
-                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s]", 
-                            socket_ptr->get_ip_info().c_str());
+                    LOG_GLOBAL_WARN("Parse client send data failed[PTL: HTTP, server: %s, err: %d]", 
+                            socket_ptr->get_ip_info().c_str(), err);
                     http_client_ptr->mutex_.lock();
                     http_client_ptr->handle_msg(http_ptl, err);
                     http_client_ptr->mutex_.unlock();
