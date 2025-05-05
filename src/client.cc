@@ -182,7 +182,7 @@ NetClient::client_func(void* arg)
         ptl::HttpParse_ErrorCode err;
         ptl::HttpPtl http_ptl;
         HttpNetClient* http_client_ptr = dynamic_cast<HttpNetClient*>(client_ptr);
-        LOG_GLOBAL_INFO("RECV:\n%s", buffer.str().c_str());
+        
         do {
             try {
                 err = http_ptl.parse(buffer);
