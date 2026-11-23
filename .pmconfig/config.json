@@ -1,0 +1,133 @@
+{
+  "name": "reactor",
+  "version": "0.1.1",
+  "path": "/home/ruanjian/workspace/project/reactor",
+  "uuid": "c1cc904f-bc70-4fd2-93a0-3cc4e34eb629",
+  "build_system": "cmake",
+  "cmake_minimum_version": "3.10",
+  "language": "CXX",
+  "cxx_standard": 14,
+  "source_dirs": [
+    "src",
+    "reactor"
+  ],
+  "include_dirs": [
+    "inc"
+  ],
+  "extern_inc_dir": "extern_inc",
+  "lib_dir": "lib",
+  "output_dir": "output",
+  "main_file": "http_chunk_test.cc",
+  "build_mode": "debug",
+  "generate_type": "static_lib",
+  "dependencies": [
+    {
+      "name": "util",
+      "version": "0.1.1",
+      "lib_type": "static"
+    },
+    {
+      "name": "basic",
+      "version": "0.1.1",
+      "lib_type": "static"
+    },
+    {
+      "name": "data_structure",
+      "version": "0.1.1",
+      "lib_type": "header-only"
+    },
+    {
+      "name": "protocol",
+      "version": "0.1.1",
+      "lib_type": "static"
+    },
+    {
+      "name": "algorithm",
+      "version": "0.1.1",
+      "lib_type": "static"
+    },
+    {
+      "name": "system",
+      "version": "0.1.1",
+      "lib_type": "static"
+    },
+    {
+      "name": "ncurses",
+      "version": "6.2",
+      "lib_type": "static"
+    }
+  ],
+  "deps": {
+    "libs": [
+      "util",
+      "basic",
+      "protocol",
+      "algorithm",
+      "system",
+      "ncurses++",
+      "form",
+      "menu",
+      "panel",
+      "ncurses",
+      "pthread"
+    ],
+    "lib_dirs": [],
+    "inc_dirs": [],
+    "src_dirs": []
+  },
+  "build_options": {
+    "debug": {
+      "defines": [
+        "DEBUG"
+      ],
+      "optimization": "-O0 -Wall"
+    },
+    "release": {
+      "defines": [
+        "NDEBUG"
+      ],
+      "optimization": "-O2 -Wall"
+    }
+  },
+  "targets": [
+    {
+      "name": "reactor",
+      "type": "static_lib"
+    },
+    {
+      "name": "http_chunk_test",
+      "type": "executable",
+      "source_files": [
+        "main/http_chunk_test.cc"
+      ]
+    },
+    {
+      "name": "http_test",
+      "type": "executable",
+      "source_files": [
+        "main/http_test.cc"
+      ]
+    },
+    {
+      "name": "echo_server_test",
+      "type": "executable",
+      "source_files": [
+        "main/echo_server_test.cc"
+      ]
+    },
+    {
+      "name": "tcp_client_test",
+      "type": "executable",
+      "source_files": [
+        "main/tcp_client_test.cc"
+      ]
+    },
+    {
+      "name": "tcp_server_test",
+      "type": "executable",
+      "source_files": [
+        "main/tcp_server_test.cc"
+      ]
+    }
+  ]
+}

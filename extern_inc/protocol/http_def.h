@@ -10,7 +10,7 @@
 #define HTTP_METHOD_PUT         "PUT"
 #define HTTP_METHOD_DELETE      "DELETE"
 #define HTTP_METHOD_HEAD        "HEAD"
-#define HTTP_METHOD_OPTION      "OPTION"
+#define HTTP_METHOD_OPTION      "OPTIONS"
 #define HTTP_METHOD_RESPONE     HTTP_VERSION
 
 // http 返回状态

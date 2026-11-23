@@ -53,7 +53,7 @@ public:
 public:
     ptl::ProtocolType type_;    // 协议类型
     std::string addr_;  // 服务器地址
-    uint16_t port_;      // 服务器端口
+    int port_;      // 服务器端口
     std::string res_path_; // 资源路径
     std::string url_; // 资源路径加参数
     std::map<std::string, std::string> param_; // 参数
@@ -155,16 +155,17 @@ enum WebsocketParse_ErrorCode {
     WebsocketParse_NotSupportWebsocket = -3
 };
 
+// WebSocket opcode 定义，取值遵循 RFC 6455 5.2 节
 enum ENUM_WEBSOCKET_OPCODE {
     WEBSOCKET_OPCODE_UNKNOWN = -1,
-    WEBSOCKET_OPCODE_CONTINUATION_FRAME = 0x01,
-    WEBSOCKET_OPCODE_TEXT_FRAME = 0x02,
-    WEBSOCKET_OPCODE_BINARY_FRAME = 0x03,
-    WEBSOCKET_OPCODE_RESERVED_FOR_NON_CONTROL_FRAMES,
+    WEBSOCKET_OPCODE_CONTINUATION_FRAME = 0x00,
+    WEBSOCKET_OPCODE_TEXT_FRAME = 0x01,
+    WEBSOCKET_OPCODE_BINARY_FRAME = 0x02,
+    WEBSOCKET_OPCODE_RESERVED_FOR_NON_CONTROL_FRAMES = 0x03, // 0x3 ~ 0x7 保留
     WEBSOCKET_OPCODE_CONNECTION_CLOSE = 0x08,
     WEBSOCKET_OPCODE_PING = 0x09,
     WEBSOCKET_OPCODE_PONG = 0x0A,
-    WEBSOCKET_OPCODE_RESERVED_FOR_CONTROL_FRAMES
+    WEBSOCKET_OPCODE_RESERVED_FOR_CONTROL_FRAMES = 0x0B    // 0xB ~ 0xF 保留
 };
 
 class WebsocketPtl {

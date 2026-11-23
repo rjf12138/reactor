@@ -50,7 +50,7 @@
 #include <sys/stat.h>
 
 #elif defined(__RJF_WINDOWS__)
-#include <window.h>
+#include <windows.h>
 #endif
 
 #endif

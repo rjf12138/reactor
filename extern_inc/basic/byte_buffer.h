@@ -47,7 +47,7 @@ public:
     ssize_t resize(ssize_t size);
 
     // 重载操作符
-    ByteBuffer& operator+(const ByteBuffer &rhs);
+    ByteBuffer operator+(const ByteBuffer &rhs);
     ByteBuffer& operator+=(const ByteBuffer &rhs);
     bool operator==(const ByteBuffer &rhs) const;
     bool operator!=(const ByteBuffer &rhs) const;
@@ -96,7 +96,8 @@ public:
     std::vector<ByteBuffer> split(const ByteBuffer &buff);
 
     // 将 Bytebuffer 中 buf1 替换为 buf2
-    // index 指定第几个匹配的子串， index 超出范围时，替换所有匹配子串, index 从0 开始计数
+    // index 指定从第几个匹配的子串开始替换(从0开始计数),
+    // index 超出范围或为负数时,替换所有匹配子串
     ByteBuffer replace(ByteBuffer buf1, const ByteBuffer &buf2, ssize_t index = 0);
 
     // 移除 ByteBuff 中匹配 buff 的子串
@@ -147,7 +148,7 @@ public:
     ByteBufferIterator operator+(ssize_t inc);
     ByteBufferIterator operator-(int des);
     // 求出两个迭代器之间的距离绝对值
-    ssize_t operator-(ByteBufferIterator &rhs);
+    ssize_t operator-(const ByteBufferIterator &rhs);
     // 前置++
     ByteBufferIterator& operator++();
     // 后置++

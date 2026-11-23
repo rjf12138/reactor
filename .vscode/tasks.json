@@ -4,13 +4,15 @@
         "tasks": [
             {
                 "type": "shell",
-                "label": "compile script",
-                "command": "project",
+                "label": "pm build",
+                "command": "pm",
                 "args": [
+                    "build",
+                    "reactor",
                     "-r"
                 ],
                 "options": {
-                    "cwd": "/home/ruanjian/workspace/project_v/reactor"
+                    "cwd": "${workspaceFolder}"
                 },
                 "group": {
                     "kind": "build",
