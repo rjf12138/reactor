@@ -1,6 +1,6 @@
 {
   "name": "reactor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "path": "/home/ruanjian/workspace/project/reactor",
   "uuid": "c1cc904f-bc70-4fd2-93a0-3cc4e34eb629",
   "build_system": "cmake",
@@ -23,7 +23,7 @@
   "dependencies": [
     {
       "name": "util",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "lib_type": "static"
     },
     {
@@ -48,7 +48,7 @@
     },
     {
       "name": "system",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "lib_type": "static"
     },
     {

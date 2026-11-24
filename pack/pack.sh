@@ -14,7 +14,7 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG_NAME="reactor"
-PKG_VERSION="0.1.1"
+PKG_VERSION="0.1.2"
 WORK_DIR="$ROOT/pack/build"
 PKG_DIR="$WORK_DIR/$PKG_NAME"
 

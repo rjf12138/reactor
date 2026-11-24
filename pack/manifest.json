@@ -1,6 +1,6 @@
 {
   "name": "reactor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "C++ network reactor library: TCP/HTTP server and client based on epoll",
   "author": "ruanjian",
   "lib_type": "static",
@@ -26,11 +26,11 @@
     },
     {
       "name": "system",
-      "version": "0.1.1"
+      "version": "0.1.2"
     },
     {
       "name": "util",
-      "version": "0.1.1"
+      "version": "0.1.2"
     }
   ]
 }

@@ -1,9 +1,12 @@
 #ifndef __REACTOR_DEFINE_H__
 #define __REACTOR_DEFINE_H__
 
+#include <atomic>
+
 #include "basic/logger.h"
 #include "data_structure/queue.h"
 #include "basic/byte_buffer.h"
+#include "protocol/protocol.h"
 #include "system/system.h"
 #include "util/util.h"
 
@@ -36,8 +39,12 @@ enum EventHandleState {  // 事件当前状态
     EventHandleState_Handling,  // 正在处理就绪事件
 };
 
+// 单个连接允许积压的待发送数据上限，防止慢客户端导致内存无限增长
+#define MAX_SEND_BUFFER_SIZE    (64 * 1024 * 1024)
+
 typedef uint64_t sock_id_t;
 typedef void (*client_conn_func_t)(sock_id_t,void*);
+typedef void (*client_close_func_t)(sock_id_t,void*);
 typedef void* (*handle_func_t)(void *);
 
 typedef struct ClientConn {
@@ -47,16 +54,48 @@ typedef struct ClientConn {
 
     // 接收缓存
     ByteBuffer recv_buffer;
+    // 发送缓存：send_data 只做入队，真正的发送在 SubReactor 事件线程中完成，
+    // 避免用户线程持锁阻塞事件线程，也避免部分发送导致数据丢失。
+    ByteBuffer send_buffer;
+    bool epoll_out_enabled;     // EPOLLOUT 是否已注册（由 SubReactor 的锁保护）
+    bool close_after_send;      // 数据发送完成后关闭连接（由 SubReactor 的锁保护）
+    std::atomic<bool> closed;   // 连接已从 SubReactor 移除，回调中不要再使用
+    bool in_callback;           // 事件线程正在处理该连接（由 SubReactor 的锁保护）
+    bool pending_delete;        // 处理结束后需要销毁（由 SubReactor 的锁保护）
+
     // 客户端连接时的处理函数
     void *client_arg;                       // 客户端类 NetClient
     void *server_arg;                       // 服务器类 NetServer
     void *connect_arg;                      // 连接类 ClientConn
     handle_func_t client_func;              // 处理连接发送的数据
     client_conn_func_t client_conn_func;    // 连接时候调用
+    // 连接从 sub reactor 移除时的通知（用于 MainReactor 清理连接关系表）
+    client_close_func_t close_func;
+    void *close_arg;
+
+    // HTTP 解析状态：chunked 解析需要跨多次可读事件保留状态
+    ptl::HttpPtl *http_ptl;
+    // WebSocket 帧解析状态
+    ptl::WebsocketPtl *ws_ptl;
     
     ClientConn(void)
-    :socket_ptr(nullptr)
-    , is_client(false) {
+    : is_client(false),
+      client_id(0),
+      socket_ptr(nullptr),
+      epoll_out_enabled(false),
+      close_after_send(false),
+      closed(false),
+      in_callback(false),
+      pending_delete(false),
+      client_arg(nullptr),
+      server_arg(nullptr),
+      connect_arg(nullptr),
+      client_func(nullptr),
+      client_conn_func(nullptr),
+      close_func(nullptr),
+      close_arg(nullptr),
+      http_ptl(nullptr),
+      ws_ptl(nullptr) {
         socket_ptr = new os::SocketTCP();
     }
 
@@ -64,8 +103,21 @@ typedef struct ClientConn {
         if (socket_ptr != nullptr) {
             socket_ptr->close();
             delete socket_ptr;
+            socket_ptr = nullptr;
+        }
+        if (http_ptl != nullptr) {
+            delete http_ptl;
+            http_ptl = nullptr;
+        }
+        if (ws_ptl != nullptr) {
+            delete ws_ptl;
+            ws_ptl = nullptr;
         }
     }
+
+    // 连接对象包含 socket、解析器等资源，禁止拷贝，避免重复释放
+    ClientConn(const ClientConn&) = delete;
+    ClientConn& operator=(const ClientConn&) = delete;
 } ClientConn_t;
 
 typedef struct EventHandle {
@@ -81,6 +133,8 @@ typedef struct EventHandle {
     
     EventHandle(void)
     : acceptor(nullptr),
+    mutex(nullptr),
+    server_arg(nullptr),
     connect_arg(nullptr),
     client_func(nullptr),
     client_conn_func(nullptr)

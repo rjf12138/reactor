@@ -11,6 +11,29 @@ TODO:
 3. 测试多个发送,断线处理，客户端定时重连功能
 4. 实现http服务器
 5. 客户端反复断线重连会有内存上的问题
+6. websocket 分片帧（FIN=0 continuation frame）尚未支持
+7. websocket 客户端心跳（heartbeat）参数尚未生效
+8. websocket 服务端的 HTTP 升级流程没有封装（当前只解析 websocket 帧）
+9. 慢客户端/发送队列缺少超时与限流策略
 
 BUG:
 当没有客户端链接到服务器，或是向不存在的客户端id发送消息时，程序会崩溃
+
+（上面这条 BUG 已修复，见下方修复记录）
+
+2026-11-24 修复记录（pm 迁移 + 网络库审查）：
+- 修复向无效 cid 发送/关闭连接时的崩溃与日志错误
+- 修复客户端连接失败路径的内存泄漏、空指针解引用和状态卡死
+- 修复事件回调中 close_client 造成的 use-after-free（连接延迟销毁）
+- 修复 MainReactor 的 mp_srv_clients_/mp_cli_to_sub_reactor_ 只增不减、
+  监听服务停止后客户端未关闭等逻辑/内存泄漏
+- 修复 SubReactor/MainReactor 事件线程未启动时 stop() 永久等待
+- 修复发送部分成功时剩余数据丢失（新增发送队列 + EPOLLOUT 异步发送；
+  close_client 改为发送完队列后再关闭）
+- 修复非阻塞 socket 的 recv/send 内部 poll 1 秒阻塞整个事件线程
+- 修复 reactor 各状态变量的跨线程数据竞争（atomic + 互斥锁）
+- 修复 WebSocket 客户端无法处理升级响应、升级失败仍标记为已连接
+- 修复 HTTP/WebSocket 解析循环在 close_client 之后继续访问连接对象
+- 修复 NetClient::handle_msg 不是虚函数导致 TCP 客户端收不到数据
+- ByteBuffer 拷贝改为只复制有效数据（原实现复制整个缓冲区容量）
+- 清理无用的 gtest 头文件/库以及旧构建产物

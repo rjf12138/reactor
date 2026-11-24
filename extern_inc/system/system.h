@@ -1,6 +1,8 @@
 #ifndef __SYSTEM_UTILS__
 #define __SYSTEM_UTILS__
 
+#include <atomic>
+
 #include "basic/basic_head.h"
 #include "basic/logger.h"
 #include "basic/byte_buffer.h"
@@ -157,15 +159,15 @@ private:
 };
 
 #define MUTEX_LOCK(mutex) (mutex.lock(__FILE__, __LINE__))
-#define MUTEX_TRY_LOCK(mutex) (mutex.try_lock(__FILE__, __LINE__))
+#define MUTEX_TRY_LOCK(mutex) (mutex.trylock(__FILE__, __LINE__))
 #define MUTEX_UNLOCK(mutex) (mutex.unlock(__FILE__, __LINE__))
 
 //////////////////////////////////////////////////////////////////////////////////////
 template<class T>
 class Atomic {
 public:
-    Atomic(void);
-    ~Atomic(void);
+    Atomic(void) = default;
+    ~Atomic(void) = default;
 
     static bool compare_and_swap(T *reg, T old_value, const T &new_value)
     {
@@ -224,6 +226,8 @@ public:
 
     // 线程初始化
     virtual int init(void);
+    // 等待线程退出。重复调用安全。
+    int join(void);
 
     // 以下函数需要重载
     // 线程调用的主体
@@ -248,6 +252,7 @@ private:
 
 private:
     bool is_init_;
+    bool is_joined_;
 #ifdef __RJF_LINUX__
     pthread_attr_t attr_;
     thread_id_t thread_id_;
@@ -304,7 +309,7 @@ public:
     // 继续执行线程
     virtual int resume(void);
 
-    virtual ThreadState get_current_state(void) const {return state_;}
+    virtual ThreadState get_current_state(void) const {return state_.load();}
 
 private:
     void thread_cond_wait(void);
@@ -317,7 +322,7 @@ private:
 private:
     time_t idle_life_; // 单位：秒
     time_t start_idle_life_;
-    ThreadState state_;
+    std::atomic<ThreadState> state_;
 
     Task task_;
     Mutex mutex_;
@@ -402,7 +407,7 @@ private:
 
 private:
     bool print_info_;
-    bool exit_;
+    std::atomic<bool> exit_;
     ThreadPoolConfig thread_pool_config_;// 多余的空闲线程会被杀死，直到数量达到最小允许的线程数为止。单位：秒
 
     Mutex thread_mutex_;
@@ -492,12 +497,12 @@ public:
     // 根据文件描述符打开文件
     // 默认退出时不关闭文件描述符
     int set_fd(int fd, bool open_when_exit = true);
-    int get_fd(void) const {return fd_;};
+    int get_fd(void) const {return file_open_flag_ ? fd_ : -1;};
 
     // 返回文件信息
     int fileinfo(struct stat &file_info);
     // 返回文件的大小
-    off_t file_size() {return file_info_.st_size;}
+    off_t file_size() {return file_open_flag_ ? file_info_.st_size : 0;}
     // 关闭文件
     int close_file(void);
     // 检查文件描述符

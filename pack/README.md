@@ -1,5 +1,15 @@
 # reactor 库打包说明（pm 包）
 
+## 项目迁移说明
+
+项目已从旧的 `.proj_config/project_config.json` 管理方式迁移到 pm：
+
+- 项目元数据：`.pmconfig/config.json`
+- 构建入口：`pm build reactor`（`CMakeLists.txt` 由 pm 自动生成，不要手工维护）
+- 依赖安装：`pm deps install reactor`
+- 旧管理器的 `.proj_config/`、旧 `src/CMakeLists.txt`、`reactor/CMakeLists.txt`
+  以及无用的 gtest 头文件/库已经移除
+
 ## 打包
 
 ```bash
@@ -9,8 +19,8 @@
 
 产物：
 
-- `~/.project_manager/repo/reactor-0.1.1.pm`
-- `~/.project_manager/repo/reactor-0.1.1.pm.sha256`
+- `~/.project_manager/repo/reactor-0.1.2.pm`
+- `~/.project_manager/repo/reactor-0.1.2.pm.sha256`
 
 包内结构：
 
@@ -43,4 +53,5 @@ pm build reactor
 
 ## 升级版本
 
-同步修改 `.pmconfig/config.json`、`pack/manifest.json`、`pack/pack.sh` 中的版本号，然后执行 `./pack.sh`。
+同步修改 `.pmconfig/config.json`、`pack/manifest.json`、`pack/pack.sh` 中的版本号，然后执行 `./pack.sh -f`。
+

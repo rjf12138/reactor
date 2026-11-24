@@ -50,8 +50,10 @@ public:
     // 发送数据到服务器上
     ssize_t send_data(ByteBuffer &buff);
 
-    // 处理服务器发送的数据
-    int handle_msg(basic::ByteBuffer &buffer);
+    // 处理服务器发送的数据（TCP 原始数据，派生类重载）
+    virtual int handle_msg(basic::ByteBuffer &buffer);
+    // 检查 websocket 升级响应（由 WSNetClient 实现）
+    virtual int check_ws_upgrade_response(ptl::HttpPtl &http_ptl);
     // 对端连接断开通知
     virtual int notify_client_disconnected(sock_id_t cid);
 
@@ -67,10 +69,11 @@ protected:
     os::Mutex mutex_;
 
 private:
-    sock_id_t cid_;
-    ClientConn_t *client_conn_ptr_;
+    std::string ip_info_;   // 连接时缓存的服务器地址，避免断开时访问已释放的连接对象
+    std::atomic<sock_id_t> cid_;
+    std::atomic<ClientConn_t*> client_conn_ptr_;
 
-    NetConnectState state_;
+    std::atomic<NetConnectState> state_;
 
     MainReactor *main_reactor_ptr_;
     SubReactor *sub_reactor_ptr_;
@@ -118,6 +121,8 @@ public:
     ssize_t send_data(basic::ByteBuffer &content, int8_t opcode, bool is_mask = false);
     // 接收服务端消息
     virtual int handle_msg(ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
+    // 检查 websocket 升级响应
+    virtual int check_ws_upgrade_response(ptl::HttpPtl &http_ptl) {return ws_ptl_.check_upgrade_response(http_ptl);}
 
 private:
     // 发送 websocket 协议升级请求
@@ -184,7 +189,7 @@ private:
     ptl::ProtocolType type_;
     os::SocketTCP server_;
 
-    NetConnectState state_;
+    std::atomic<NetConnectState> state_;
 
     os::Mutex mutex_;
 
