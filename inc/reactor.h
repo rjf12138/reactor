@@ -117,8 +117,8 @@ public:
     // 取消定时任务
     int cancel_timer_task(util::timer_id_t tid) {return NetClient::cancel_timer_task(tid);}
 
-    // 发送数据
-    ssize_t send_data(basic::ByteBuffer &content, int8_t opcode, bool is_mask = false);
+    // 发送数据。RFC 6455 要求客户端发出的帧必须掩码，因此默认 is_mask=true
+    ssize_t send_data(basic::ByteBuffer &content, int8_t opcode, bool is_mask = true);
     // 接收服务端消息
     virtual int handle_msg(ptl::WebsocketPtl &ptl, ptl::WebsocketParse_ErrorCode err);
     // 检查 websocket 升级响应

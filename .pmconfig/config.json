@@ -128,6 +128,13 @@
       "source_files": [
         "main/tcp_server_test.cc"
       ]
+    },
+    {
+      "name": "ws_send_test",
+      "type": "executable",
+      "source_files": [
+        "main/ws_send_test.cc"
+      ]
     }
   ]
 }

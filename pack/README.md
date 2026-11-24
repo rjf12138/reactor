@@ -49,7 +49,8 @@ pm build reactor
 ```
 
 会构建 `libreactord.a` 以及 `http_chunk_test`、`http_test`、`echo_server_test`、
-`tcp_client_test`、`tcp_server_test`。这些测试是网络/服务端集成测试，需要按场景手工运行。
+`tcp_client_test`、`tcp_server_test`、`ws_send_test`。这些测试是网络/服务端集成测试，
+需要按场景手工运行；`ws_send_test` 是自动化测试，直接执行，返回 0 表示通过。
 
 ## 升级版本
 

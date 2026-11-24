@@ -75,6 +75,11 @@ add_executable(tcp_server_test
     ${SRC_FILES}
 )
 
+add_executable(ws_send_test
+    ${CMAKE_SOURCE_DIR}/main/ws_send_test.cc
+    ${SRC_FILES}
+)
+
 # Include dirs for target reactor
 target_include_directories(reactor PRIVATE ${CMAKE_SOURCE_DIR}/inc)
 target_include_directories(reactor PRIVATE ${CMAKE_SOURCE_DIR}/extern_inc)
@@ -110,6 +115,12 @@ target_include_directories(tcp_server_test PRIVATE ${CMAKE_SOURCE_DIR}/inc)
 target_include_directories(tcp_server_test PRIVATE ${CMAKE_SOURCE_DIR}/extern_inc)
 target_include_directories(tcp_server_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(tcp_server_test PRIVATE ${CMAKE_SOURCE_DIR}/reactor)
+
+# Include dirs for target ws_send_test
+target_include_directories(ws_send_test PRIVATE ${CMAKE_SOURCE_DIR}/inc)
+target_include_directories(ws_send_test PRIVATE ${CMAKE_SOURCE_DIR}/extern_inc)
+target_include_directories(ws_send_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(ws_send_test PRIVATE ${CMAKE_SOURCE_DIR}/reactor)
 
 # Legacy dependencies
 target_link_libraries(reactor
@@ -178,6 +189,19 @@ target_link_libraries(tcp_client_test
     pthread
 )
 target_link_libraries(tcp_server_test
+    util
+    basic
+    protocol
+    algorithm
+    system
+    ncurses++
+    form
+    menu
+    panel
+    ncurses
+    pthread
+)
+target_link_libraries(ws_send_test
     util
     basic
     protocol

@@ -1,25 +1,37 @@
 研究问题：
 1. epoll的ET模式当发送数据过快时， 会出现触发了但未及时处理，导致之后不在触发使数据并未即使处理。
+   【现状：当前实现未注册 EPOLLET，是水平触发(LT)，且 recv 读到 EAGAIN 立即返回，
+   不会出现“未及时处理导致不再触发”；如果以后改为 ET，需要补完整的读写循环。】
 2. 目前数据发送只有一个线程，当发送任务过多时，可能会产生瓶颈。
+   【部分改善：已改为“每连接发送队列 + EPOLLOUT”，由各 SubReactor 事件线程异步发送，
+   调用方不再同步阻塞；但仍没有独立的发送线程池，读写仍共用 SubReactor 线程。】
 3. handle_msg改成递归的而不是并行的。比如解析http应该，先解析tcp的，然后在调用handle_msg解析http的
+   【未改：仍按连接 type_ 分支解析后直接回调 handle_msg。】
 
 性能测试问题：
 
 TODO:
 1. 测试 websocket 发送。
+   【已完成：main/ws_send_test.cc，覆盖客户端发送帧（mask/opcode/payload）和服务器回显。】
 2. 写文档
+   【未完成：只更新了 pack/README.md 和本文件的修复记录。】
 3. 测试多个发送,断线处理，客户端定时重连功能
+   【部分：已验证 20 次 HTTP 请求、50 次连接/断开；无自动重连功能、无多客户端并发压力测试。】
 4. 实现http服务器
+   【基础 HTTP server 可用并已验证（NetServer + ProtocolType_Http）；
+   完整服务器框架（路由、keep-alive 超时等）未做。】
 5. 客户端反复断线重连会有内存上的问题
-6. websocket 分片帧（FIN=0 continuation frame）尚未支持
-7. websocket 客户端心跳（heartbeat）参数尚未生效
-8. websocket 服务端的 HTTP 升级流程没有封装（当前只解析 websocket 帧）
-9. 慢客户端/发送队列缺少超时与限流策略
+   【已修复并验证：连接失败/断开路径泄漏、延迟销毁、map 清理；
+   ASan/LSan 下 50 次 connect/disconnect 无泄漏。】
+6. websocket 分片帧（FIN=0 continuation frame）尚未支持【未做】
+7. websocket 客户端心跳（heartbeat）参数尚未生效【未做】
+8. websocket 服务端的 HTTP 升级流程没有封装（当前只解析 websocket 帧）【未做】
+9. 慢客户端/发送队列缺少超时与限流策略【未做，仅有单连接 64MB 队列上限】
+10. 协议层没有校验“客户端发来的帧必须带 mask”（RFC 6455，服务端安全项）【未做】
 
 BUG:
 当没有客户端链接到服务器，或是向不存在的客户端id发送消息时，程序会崩溃
-
-（上面这条 BUG 已修复，见下方修复记录）
+【已修复并验证：返回错误，不再崩溃。】
 
 2026-11-24 修复记录（pm 迁移 + 网络库审查）：
 - 修复向无效 cid 发送/关闭连接时的崩溃与日志错误
@@ -37,3 +49,8 @@ BUG:
 - 修复 NetClient::handle_msg 不是虚函数导致 TCP 客户端收不到数据
 - ByteBuffer 拷贝改为只复制有效数据（原实现复制整个缓冲区容量）
 - 清理无用的 gtest 头文件/库以及旧构建产物
+
+2026-11-24 补充：
+- WSNetClient::send_data 默认 is_mask 改为 true（RFC 6455 要求客户端帧必须掩码）
+- 新增 main/ws_send_test.cc：自动化验证 WebSocket 客户端发送帧
+  （默认 mask、opcode、payload）以及服务器回显，测试结果已通过
